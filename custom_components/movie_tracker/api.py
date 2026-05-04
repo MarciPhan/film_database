@@ -121,12 +121,14 @@ class CSFDScraper:
                 html = await response.text()
                 return await CSFDScraper.parse_movie_page(html, url)
 
-async def get_hellspy_video_url(title: str, episode_title: str = None) -> str:
+async def get_hellspy_video_url(title: str, episode_title: str = None, language: str = "CZ") -> str:
     """Search Hellspy and return the first result URL."""
     query = title
     if episode_title:
-        # Try to extract S01E01 pattern if possible or just use title
         query = f"{title} {episode_title}"
+    
+    if language == "CZ":
+        query += " cz dabing"
     
     search_url = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
     try:

@@ -30,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     data.setdefault("watched", {})  # id -> movie_details
     data.setdefault("wishlist", {}) # id -> movie_details
     data.setdefault("history", [])  # list of watch events
+    data.setdefault("settings", {"language": "CZ"}) # User settings
     
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = data
@@ -86,7 +87,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 return web.json_response({})
             details = await CSFDScraper.get_details(url)
             if details:
-                details["hellspy_url"] = await get_hellspy_video_url(details["title"])
+                lang = data.get("settings", {}).get("language", "CZ")
+                details["hellspy_url"] = await get_hellspy_video_url(details["title"], language=lang)
             return web.json_response(details)
 
     hass.http.register_view(PanelJsView())
@@ -136,6 +138,9 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             target.setdefault("watched_episodes", [])
             if ep_url not in target["watched_episodes"]:
                 target["watched_episodes"].append(ep_url)
+        
+        elif action == "update_settings":
+            data["settings"].update(call.data.get("settings", {}))
         
         await _save()
 

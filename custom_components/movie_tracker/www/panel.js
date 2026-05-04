@@ -140,6 +140,10 @@ class MovieTrackerPanel extends LitElement {
       <div class="p">
         <div class="hdr">
           <h1><ha-icon icon="mdi:movie-roll"></ha-icon> Filmotéka</h1>
+          <div style="display:flex;gap:8px">
+            <button class="btn bo ${this.data.settings?.language==='CZ'?'on':''}" style="padding:4px 10px;font-size:0.75rem" @click=${()=>this._action('update_settings', {}, {settings:{language:'CZ'}})}>CZ</button>
+            <button class="btn bo ${this.data.settings?.language==='EN'?'on':''}" style="padding:4px 10px;font-size:0.75rem" @click=${()=>this._action('update_settings', {}, {settings:{language:'EN'}})}>EN</button>
+          </div>
         </div>
 
         <div class="tabs">
