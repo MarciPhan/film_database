@@ -62,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             # Add Hellspy links and recommendations dynamically if needed, 
             # or just serve raw data
             res = dict(data)
-            res["recommendations"] = get_recommendations(data["watched"], {})
+            res["recommendations"] = get_recommendations(data["watched"], data["wishlist"])
             return web.json_response(res)
 
     class SearchView(HomeAssistantView):
