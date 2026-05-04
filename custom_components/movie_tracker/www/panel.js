@@ -140,27 +140,60 @@ class MovieTrackerPanel extends LitElement {
       <div class="p">
         <div class="hdr">
           <h1><ha-icon icon="mdi:movie-roll"></ha-icon> Filmotéka</h1>
-          <div style="display:flex;gap:8px">
-            <button class="btn bo ${this.data.settings?.language==='CZ'?'on':''}" style="padding:4px 10px;font-size:0.75rem" @click=${()=>this._action('update_settings', {}, {settings:{language:'CZ'}})}>CZ</button>
-            <button class="btn bo ${this.data.settings?.language==='EN'?'on':''}" style="padding:4px 10px;font-size:0.75rem" @click=${()=>this._action('update_settings', {}, {settings:{language:'EN'}})}>EN</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="lang-toggle">
+              <button class="btn bo ${this.data.settings?.language==='CZ'?'on':''}" @click=${()=>this._action('update_settings', {}, {settings:{language:'CZ'}})}>CZ</button>
+              <button class="btn bo ${this.data.settings?.language==='EN'?'on':''}" @click=${()=>this._action('update_settings', {}, {settings:{language:'EN'}})}>EN</button>
+            </div>
           </div>
+        </div>
+
+        <div class="tbar main-search">
+          <ha-icon icon="mdi:magnify"></ha-icon>
+          <input type="text" placeholder="Hledat film, seriál nebo rande…" 
+            .value=${this.search} 
+            @input=${e => this.search = e.target.value}
+            @keyup=${e => e.key === 'Enter' && this._doSearch()}>
+          <button class="btn bp" @click=${this._doSearch} ?disabled=${this.searching}>
+            ${this.searching ? '…' : 'Hledat'}
+          </button>
         </div>
 
         <div class="tabs">
           <div class="tb ${this.tab === 'dashboard' ? 'on' : ''}" @click=${() => this.tab = 'dashboard'}>Přehled</div>
           <div class="tb ${this.tab === 'library' ? 'on' : ''}" @click=${() => this.tab = 'library'}>Knihovna (${watched.length})</div>
           <div class="tb ${this.tab === 'wishlist' ? 'on' : ''}" @click=${() => this.tab = 'wishlist'}>Wishlist (${wishlist.length})</div>
-          <div class="tb ${this.tab === 'discover' ? 'on' : ''}" @click=${() => this.tab = 'discover'}>Objevovat</div>
+          ${this.searchResults.length > 0 ? html`<div class="tb on" @click=${() => this.searchResults = []}>Výsledky (${this.searchResults.length}) ×</div>` : ''}
         </div>
 
-        ${this.tab === 'dashboard' ? this._renderDashboard(watched) : ''}
-        ${this.tab === 'library' ? this._renderGrid(watched, 'watched') : ''}
-        ${this.tab === 'wishlist' ? this._renderGrid(wishlist, 'wishlist') : ''}
-        ${this.tab === 'discover' ? this._renderDiscover() : ''}
+        ${this.searchResults.length > 0 ? this._renderSearchResults() : html`
+          ${this.tab === 'dashboard' ? this._renderDashboard(watched) : ''}
+          ${this.tab === 'library' ? this._renderGrid(watched, 'watched') : ''}
+          ${this.tab === 'wishlist' ? this._renderGrid(wishlist, 'wishlist') : ''}
+        `}
 
         ${this.selectedMovie ? this._renderDetail() : ''}
         ${this.toast ? html`<div class="toast">${this.toast}</div>` : ''}
       </div>
+    `;
+  }
+
+  _renderSearchResults() {
+    return html`
+        <div class="gr">
+          ${this.searchResults.map(m => html`
+            <div class="c" @click=${() => this._viewDetail(m)}>
+              <img class="ci" src="${m.image || 'https://via.placeholder.com/300x450?text=Bez+plakatu'}">
+              <div class="cb">
+                <h3 class="ct">${m.title}</h3>
+                <div class="cm">${m.year} • ${m.type === 'series' ? 'Seriál' : 'Film'}</div>
+              </div>
+            </div>
+          `)}
+        </div>
+        <div style="margin-top:20px;text-align:center">
+            <button class="btn bo" @click=${() => this.searchResults = []}>Zavřít výsledky</button>
+        </div>
     `;
   }
 
