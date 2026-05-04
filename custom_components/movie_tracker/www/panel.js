@@ -81,8 +81,6 @@ class MovieTrackerPanel extends LitElement {
     this._t(action === 'watch' ? "Označeno jako shlédnuté" : "Přidáno do wishlistu");
     if (action === 'watch' || action === 'wishlist') {
         this.selectedMovie = null;
-        this.searchResults = [];
-        this.search = "";
     }
     setTimeout(() => this._fetch(), 1000);
   }
