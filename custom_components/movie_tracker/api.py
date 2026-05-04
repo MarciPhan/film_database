@@ -60,34 +60,85 @@ class CSFDScraper:
                         return {}
                     
                     item = data["results"][0]
-                    return {
+                    title = item.get("nazev", "")
+                    plot = item.get("plot", "")
+                    
+                    # Better series detection
+                    is_series = (
+                        item.get("typ") in ["series", "tvSeries"] or 
+                        "seriál" in plot.lower() or 
+                        "seriálu" in plot.lower() or
+                        item.get("cas") == "N/A"
+                    )
+                    
+                    details = {
                         "id": str(item.get("id")),
-                        "title": item.get("nazev"),
+                        "title": title,
                         "year": str(item.get("rok")),
                         "rating": item.get("hodnoceni", "0%"),
                         "poster": item.get("obrazek_url"),
                         "genres": [g.strip() for g in item.get("zanr", "").split(",")] if item.get("zanr") else [],
                         "origin": f"{item.get('zeme', '')} ({item.get('rok', '')})",
-                        "description": item.get("plot", ""),
+                        "description": plot,
                         "url": item.get("csfd_url"),
-                        "type": "series" if item.get("typ") == "tvSeries" else "movie",
-                        "episodes": [] # CZDB might not have full episode list in this format, but we can handle it
+                        "type": "series" if is_series else "movie",
+                        "episodes": []
                     }
+
+                    # If it's a series, try to fetch episodes from CSFD
+                    if is_series and details["url"]:
+                        try:
+                            # Use HEADERS to bypass simple bot protection
+                            async with session.get(details["url"], headers={
+                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                            }, timeout=5) as csfd_resp:
+                                if csfd_resp.status == 200:
+                                    html = await csfd_resp.text()
+                                    from bs4 import BeautifulSoup
+                                    soup = BeautifulSoup(html, "html.parser")
+                                    # Look for episodes in the side box or main content
+                                    ep_items = soup.select(".box-series-episodes li") or soup.select(".episodes-list li")
+                                    for ep in ep_items:
+                                        link = ep.select_one("a")
+                                        if link:
+                                            details["episodes"].append({
+                                                "title": link.get_text(strip=True),
+                                                "url": f"https://www.csfd.cz{link['href']}" if link['href'].startswith("/") else link['href']
+                                            })
+                        except Exception as e:
+                            _LOGGER.debug("Failed to fetch episodes from CSFD: %s", e)
+
+                    return details
         except Exception as e:
             _LOGGER.error("CZDB detail fetch failed: %s", e)
             return {}
 
 async def get_hellspy_video_url(title: str, language: str = "CZ") -> str:
-    """Return direct search URL for Hellspy."""
+    """Search Hellspy and return the first result URL directly."""
     query = title
     if language == "CZ":
         query += " cz dabing"
     
-    # We return the search URL directly for now as it's more reliable than scraping results
-    return f"https://hellspy.to/?query={urllib.parse.quote(query)}"
+    search_url = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(search_url, timeout=10) as resp:
+                if resp.status == 200:
+                    html = await resp.text()
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(html, "html.parser")
+                    # Find the first link that contains '/video/'
+                    first_video = soup.select_one("a[href*='/video/']")
+                    if first_video:
+                        href = first_video.get("href")
+                        return f"https://hellspy.to{href}" if href.startswith("/") else href
+    except Exception as e:
+        _LOGGER.debug("Failed to scrape Hellspy: %s", e)
+    
+    return search_url
 
-def get_recommendations(watched_data: dict, all_movies: dict) -> list:
-    """Simple recommendation engine based on genres."""
+def get_recommendations(watched_data: dict, wishlist_data: dict) -> list:
+    """Recommend movies from wishlist based on watched genres."""
     genre_scores = {}
     for movie in watched_data.values():
         for genre in movie.get('genres', []):
@@ -97,4 +148,16 @@ def get_recommendations(watched_data: dict, all_movies: dict) -> list:
         return []
         
     top_genres = sorted(genre_scores.items(), key=lambda x: x[1], reverse=True)[:3]
-    return [g[0] for g in top_genres]
+    top_genre_names = [g[0] for g in top_genres]
+    
+    recommendations = []
+    # Find movies in wishlist that match top genres
+    for movie in wishlist_data.values():
+        movie_genres = movie.get('genres', [])
+        # If any of the movie's genres match our top genres
+        if any(g in top_genre_names for g in movie_genres):
+            recommendations.append(movie)
+            if len(recommendations) >= 6:
+                break
+                
+    return recommendations

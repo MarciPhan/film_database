@@ -10,7 +10,9 @@ class MovieTrackerPanel extends LitElement {
       searchResults: { type: Array },
       searching: { type: Boolean },
       selectedMovie: { type: Object },
-      toast: { type: String }
+      toast: { type: String },
+      filterGenre: { type: String },
+      sortBy: { type: String }
     };
   }
 
@@ -23,6 +25,8 @@ class MovieTrackerPanel extends LitElement {
     this.searching = false;
     this.selectedMovie = null;
     this.toast = "";
+    this.filterGenre = "";
+    this.sortBy = "newest";
   }
 
   connectedCallback() {
@@ -130,12 +134,36 @@ class MovieTrackerPanel extends LitElement {
       .ep-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
       .ep { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; }
       .checked { color: var(--g); }
+      .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; }
+      .filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; flex: 1; scrollbar-width: none; }
+      .filters::-webkit-scrollbar { display: none; }
+      .chip { padding: 6px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: .2s; }
+      .chip.on { background: var(--a); border-color: var(--a); color: #fff; }
+      select.btn { appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 16px; }
     `;
   }
 
   render() {
     const watched = Object.values(this.data.watched || {});
     const wishlist = Object.values(this.data.wishlist || {});
+    
+    let movies = this.tab === 'library' ? watched : wishlist;
+    
+    // Apply filters
+    if (this.filterGenre) {
+        movies = movies.filter(m => m.genres?.includes(this.filterGenre));
+    }
+    
+    // Apply sorting
+    movies = [...movies].sort((a, b) => {
+        if (this.sortBy === 'alphabet') return a.title.localeCompare(b.title);
+        if (this.sortBy === 'rating') return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+        if (this.sortBy === 'year') return (parseInt(b.year) || 0) - (parseInt(a.year) || 0);
+        return new Date(b.added_at || 0) - new Date(a.added_at || 0);
+    });
+
+    const allGenres = [...new Set((this.tab === 'library' ? watched : wishlist).flatMap(m => m.genres || []))].sort();
+
     return html`
       <div class="p">
         <div class="hdr">
@@ -160,16 +188,33 @@ class MovieTrackerPanel extends LitElement {
         </div>
 
         <div class="tabs">
-          <div class="tb ${this.tab === 'dashboard' ? 'on' : ''}" @click=${() => this.tab = 'dashboard'}>Přehled</div>
-          <div class="tb ${this.tab === 'library' ? 'on' : ''}" @click=${() => this.tab = 'library'}>Knihovna (${watched.length})</div>
-          <div class="tb ${this.tab === 'wishlist' ? 'on' : ''}" @click=${() => this.tab = 'wishlist'}>Wishlist (${wishlist.length})</div>
+          <div class="tb ${this.tab === 'dashboard' ? 'on' : ''}" @click=${() => {this.tab = 'dashboard'; this.filterGenre = ''}}>Přehled</div>
+          <div class="tb ${this.tab === 'library' ? 'on' : ''}" @click=${() => {this.tab = 'library'; this.filterGenre = ''}}>Shlédnuto (${watched.length})</div>
+          <div class="tb ${this.tab === 'wishlist' ? 'on' : ''}" @click=${() => {this.tab = 'wishlist'; this.filterGenre = ''}}>Wishlist (${wishlist.length})</div>
           ${this.searchResults.length > 0 ? html`<div class="tb on" @click=${() => this.searchResults = []}>Výsledky (${this.searchResults.length}) ×</div>` : ''}
         </div>
 
         ${this.searchResults.length > 0 ? this._renderSearchResults() : html`
+          ${this.tab !== 'dashboard' ? html`
+            <div class="controls">
+              <div class="filters">
+                <span class="chip ${!this.filterGenre ? 'on' : ''}" @click=${() => this.filterGenre = ""}>Vše</span>
+                ${allGenres.map(g => html`
+                  <span class="chip ${this.filterGenre === g ? 'on' : ''}" @click=${() => this.filterGenre = g}>${g}</span>
+                `)}
+              </div>
+              <select class="btn bo" @change=${e => this.sortBy = e.target.value}>
+                <option value="newest" ?selected=${this.sortBy==='newest'}>Nejnovější</option>
+                <option value="alphabet" ?selected=${this.sortBy==='alphabet'}>Abecedně</option>
+                <option value="rating" ?selected=${this.sortBy==='rating'}>Podle hodnocení</option>
+                <option value="year" ?selected=${this.sortBy==='year'}>Podle roku</option>
+              </select>
+            </div>
+          ` : ''}
+          
           ${this.tab === 'dashboard' ? this._renderDashboard(watched) : ''}
-          ${this.tab === 'library' ? this._renderGrid(watched, 'watched') : ''}
-          ${this.tab === 'wishlist' ? this._renderGrid(wishlist, 'wishlist') : ''}
+          ${this.tab === 'library' ? this._renderGrid(movies, 'watched') : ''}
+          ${this.tab === 'wishlist' ? this._renderGrid(movies, 'wishlist') : ''}
         `}
 
         ${this.selectedMovie ? this._renderDetail() : ''}
@@ -202,9 +247,9 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <section>
         ${recs.length > 0 ? html`
-          <h3>✨ Doporučené žánry pro vás</h3>
-          <div style="display:flex;gap:10px;margin-bottom:30px">
-            ${recs.map(g => html`<span class="btn bo" style="cursor:default">${g}</span>`)}
+          <h3 style="display:flex;align-items:center;gap:10px">✨ Doporučeno pro vás <span class="badge" style="background:var(--a)">Na základě žánrů</span></h3>
+          <div class="gr" style="margin-bottom:40px">
+            ${recs.map(m => this._renderMovieCard(m, 'wishlist'))}
           </div>
         ` : ''}
         
