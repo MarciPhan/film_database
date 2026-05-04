@@ -89,37 +89,32 @@ class CSFDScraper:
                         "episodes": []
                     }
 
-                    # If it's a series, try to fetch episodes from CSFD, fallback to TMDb
+                    # If it's a series, try to fetch episodes from SerialZone (much more reliable for bots)
                     if is_series:
-                        # Try CSFD first
-                        if details["url"]:
-                            try:
-                                async with session.get(details["url"], headers={
-                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                                }, timeout=5) as csfd_resp:
-                                    if csfd_resp.status == 200:
-                                        html = await csfd_resp.text()
-                                        from bs4 import BeautifulSoup
-                                        soup = BeautifulSoup(html, "html.parser")
-                                        ep_items = soup.select(".box-series-episodes li") or soup.select(".episodes-list li")
-                                        for ep in ep_items:
-                                            link = ep.select_one("a")
-                                            if link:
-                                                details["episodes"].append({
-                                                    "title": link.get_text(strip=True),
-                                                    "url": f"https://www.csfd.cz{link['href']}" if link['href'].startswith("/") else link['href']
-                                                })
-                            except Exception: pass
-
-                        # Fallback to TMDb if no episodes found
-                        if not details["episodes"]:
-                            try:
-                                # Use a public TMDb search if possible, or just mock some basic seasons if we can't
-                                # For now, we will at least ensure the type is correct and we show a message
-                                if not details["episodes"]:
-                                    _LOGGER.debug("No episodes found for %s, using generic fallback", title)
-                                    # We could add a more complex TMDb scraper here if needed
-                            except Exception: pass
+                        try:
+                            # Search SerialZone by title
+                            search_url = f"https://www.serialzone.cz/hledani/?q={urllib.parse.quote(title)}"
+                            async with session.get(search_url, timeout=5) as sz_resp:
+                                if sz_resp.status == 200:
+                                    sz_html = await sz_resp.text()
+                                    if "/serial/" in sz_html:
+                                        # Find the first serial link
+                                        match = re.search(r'href="(/serial/[^/]+/)', sz_html)
+                                        if match:
+                                            ep_page_url = f"https://www.serialzone.cz{match.group(1)}epizody/"
+                                            async with session.get(ep_page_url, timeout=5) as ep_resp:
+                                                if ep_resp.status == 200:
+                                                    ep_html = await ep_resp.text()
+                                                    # Parse episodes (simple regex for speed and reliability)
+                                                    ep_matches = re.findall(r'href="(/epizoda/[^"]+)">(.*?)</a>', ep_html)
+                                                    for href, ep_title in ep_matches:
+                                                        if ep_title and "<" not in ep_title:
+                                                            details["episodes"].append({
+                                                                "title": ep_title.strip(),
+                                                                "url": f"https://www.serialzone.cz{href}"
+                                                            })
+                        except Exception as e:
+                            _LOGGER.debug("SerialZone fallback failed: %s", e)
 
                     return details
         except Exception as e:
