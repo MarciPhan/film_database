@@ -30,13 +30,18 @@ class CSFDScraper:
                         alt = item.get("alt_nazev", "")
                         is_series = "seriál" in title.lower() or "seriál" in alt.lower() or item.get("typ") == "tvSeries"
                         
+                        image = item.get("obrazek_url") or item.get("imgo")
+                        if not image or "pmgstatic" in image:
+                            # Placeholder that looks better
+                            image = f"https://via.placeholder.com/300x450?text={urllib.parse.quote(title)}"
+                        
                         results.append({
                             "id": str(item.get("id")),
                             "csfd_id": str(item.get("csfd_id")),
                             "title": title,
                             "year": str(item.get("rok")),
                             "url": item.get("csfd_url"),
-                            "image": item.get("obrazek_url") or item.get("imgo") or f"https://via.placeholder.com/300x450?text={urllib.parse.quote(title)}",
+                            "image": image,
                             "type": "series" if is_series else "movie"
                         })
                     return results[:15]
@@ -89,10 +94,13 @@ class CSFDScraper:
                         "episodes": []
                     }
 
-                    # If it's a series, try to fetch episodes from SerialZone (much more reliable for bots)
+                    # --- EPISODES FETCHING ---
+                    if is_series:
+                        _LOGGER.debug("Fetching episodes for series: %s", title)
                         # Multi-level fallback for episodes
                         for provider in ["serialzone", "kinobox", "tmdb"]:
                             if details["episodes"]: break
+                            _LOGGER.debug("Trying provider: %s", provider)
                             try:
                                 if provider == "serialzone":
                                     # Search SerialZone
@@ -111,20 +119,19 @@ class CSFDScraper:
                                                             if ep_title and "<" not in ep_title:
                                                                 details["episodes"].append({"title": ep_title.strip(), "url": f"https://www.serialzone.cz{href}"})
                                 
-                                elif provider == "kinobox":
-                                    # Search Kinobox (simple search)
-                                    search_url = f"https://www.kinobox.cz/vyhledavani?q={urllib.parse.quote(title)}"
-                                    async with session.get(search_url, timeout=5) as kb_resp:
-                                        if kb_resp.status == 200:
-                                            kb_html = await kb_resp.text()
-                                            # We just need to find if it's there, kinobox is harder to scrape without API
-                                            # but we can try to find episode titles in the text
-                                            pass
-                                            
                                 elif provider == "tmdb":
-                                    # Global fallback - just show basic info if needed
-                                    pass
-                            except Exception: continue
+                                    # Use TMDb for posters as a side effect
+                                    tmdb_search = f"https://api.themoviedb.org/3/search/tv?api_key=fba01042790176412f7161b9a953e5e0&query={urllib.parse.quote(title)}&language=cs-CZ"
+                                    async with session.get(tmdb_search, timeout=5) as tmdb_resp:
+                                        if tmdb_resp.status == 200:
+                                            tmdb_data = await tmdb_resp.json()
+                                            if tmdb_data.get("results"):
+                                                res = tmdb_data["results"][0]
+                                                if not details["poster"] or "placeholder" in details["poster"]:
+                                                    details["poster"] = f"https://image.tmdb.org/t/p/w500{res.get('poster_path')}"
+                            except Exception as e:
+                                _LOGGER.debug("Provider %s failed: %s", provider, e)
+                                continue
 
                     return details
         except Exception as e:
