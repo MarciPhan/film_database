@@ -117,7 +117,10 @@ class MovieTrackerPanel extends LitElement {
       .cb { padding: 15px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
       .ct { font-size: 1rem; font-weight: 700; margin: 0; line-height: 1.2; }
       .cm { font-size: 0.8rem; color: var(--dim); }
-      .rtg { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); }
+      .rtg { position: absolute; top: 10px; right: 10px; color: #fff; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); }
+      .rtg.red { background: rgba(239, 68, 68, 0.8); }
+      .rtg.yellow { background: rgba(234, 179, 8, 0.8); }
+      .rtg.green { background: rgba(34, 197, 94, 0.8); }
       .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: .2s; font-size: 0.9rem; text-decoration: none; }
       .bp { background: var(--a); color: #fff; }
       .bo { background: transparent; border: 1px solid var(--border); color: var(--txt); }
@@ -168,7 +171,8 @@ class MovieTrackerPanel extends LitElement {
       <div class="p">
         <div class="hdr">
           <h1><ha-icon icon="mdi:movie-roll"></ha-icon> Filmotéka</h1>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:12px;align-items:center">
+            <ha-icon icon="mdi:refresh" style="cursor:pointer;color:var(--dim)" @click=${this._fetch}></ha-icon>
             <div class="lang-toggle">
               <button class="btn bo ${this.data.settings?.language==='CZ'?'on':''}" @click=${()=>this._action('update_settings', {}, {settings:{language:'CZ'}})}>CZ</button>
               <button class="btn bo ${this.data.settings?.language==='EN'?'on':''}" @click=${()=>this._action('update_settings', {}, {settings:{language:'EN'}})}>EN</button>
@@ -298,9 +302,11 @@ class MovieTrackerPanel extends LitElement {
   }
 
   _renderMovieCard(m, type) {
+    const val = parseInt(m.rating) || 0;
+    const rtgCls = val >= 75 ? 'green' : (val >= 50 ? 'yellow' : 'red');
     return html`
       <div class="c" @click=${() => this._viewDetail(m)}>
-        ${m.rating ? html`<div class="rtg">${m.rating}</div>` : ''}
+        ${m.rating ? html`<div class="rtg ${rtgCls}">${m.rating}</div>` : ''}
         <img class="ci" src="${m.poster || m.image || 'https://via.placeholder.com/300x450?text=Bez+plakatu'}">
         <div class="cb">
           <h3 class="ct">${m.title}</h3>
