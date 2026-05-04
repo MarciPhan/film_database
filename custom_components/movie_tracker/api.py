@@ -28,17 +28,16 @@ class CSFDScraper:
                     for item in data.get("results", []):
                         title = item.get("nazev", "")
                         alt = item.get("alt_nazev", "")
-                        # Extreme series detection
+                        # Smart series detection via API data
                         is_series = (
-                            "seriál" in title.lower() or 
-                            "seriál" in alt.lower() or 
                             item.get("typ") in ["tvSeries", "series"] or
-                            title in ["Stranger Things", "Mentalista", "The Mentalist"]
+                            item.get("cas") == "N/A" or
+                            "seriál" in title.lower() or
+                            "seriál" in alt.lower()
                         )
                         
                         image = item.get("obrazek_url") or item.get("imgo")
                         if not image or "pmgstatic" in image or "via.placeholder" in image:
-                            # Use a static transparent 1x1 base64 or just empty
                             image = ""
                         
                         results.append({
