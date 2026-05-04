@@ -1,0 +1,11 @@
+{
+  "domain": "movie_tracker",
+  "name": "Filmotéka",
+  "documentation": "https://github.com/MarciPhan/film_database",
+  "dependencies": [],
+  "codeowners": ["@MarciPhan"],
+  "requirements": ["beautifulsoup4==4.12.3", "aiohttp==3.9.3"],
+  "version": "1.0.0",
+  "iot_class": "cloud_polling",
+  "config_flow": true
+}
