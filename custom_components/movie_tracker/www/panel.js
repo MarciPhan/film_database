@@ -259,9 +259,10 @@ class MovieTrackerPanel extends LitElement {
                 ${m.episodes.map(ep => {
                   const watched = (this.data.watched[m.id]?.watched_episodes || []).includes(ep.url);
                   return html`
-                    <div class="ep" @click=${() => this._action('mark_episode', m, { episode_url: ep.url })}>
-                      <ha-icon icon="${watched ? 'mdi:check-circle' : 'mdi:circle-outline'}" class="${watched ? 'checked' : ''}"></ha-icon>
-                      ${ep.title}
+                    <div class="ep">
+                      <ha-icon icon="${watched ? 'mdi:check-circle' : 'mdi:circle-outline'}" class="${watched ? 'checked' : ''}" @click=${() => this._action('mark_episode', m, { episode_url: ep.url })}></ha-icon>
+                      <span style="flex:1">${ep.title}</span>
+                      <a href="https://hellspy.to/?query=${encodeURIComponent(m.title + ' ' + ep.title)}" target="_blank" class="badge" style="text-decoration:none;color:var(--a)">Sledovat</a>
                     </div>
                   `;
                 })}

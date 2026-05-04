@@ -12,7 +12,7 @@ from homeassistant.components.http import HomeAssistantView
 import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION, EVENT_MOVIES_UPDATED
-from .api import CSFDScraper, get_hellspy_link, get_recommendations
+from .api import CSFDScraper, get_hellspy_video_url, get_recommendations
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 return web.json_response({})
             details = await CSFDScraper.get_details(url)
             if details:
-                details["hellspy_url"] = get_hellspy_link(details["title"])
+                details["hellspy_url"] = await get_hellspy_video_url(details["title"])
             return web.json_response(details)
 
     hass.http.register_view(PanelJsView())

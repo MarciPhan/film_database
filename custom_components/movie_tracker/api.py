@@ -7,7 +7,10 @@ import re
 _LOGGER = logging.getLogger(__name__)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "cs,en-US;q=0.7,en;q=0.3",
+    "Referer": "https://www.google.com/"
 }
 
 class CSFDScraper:
@@ -118,10 +121,30 @@ class CSFDScraper:
                 html = await response.text()
                 return await CSFDScraper.parse_movie_page(html, url)
 
-def get_hellspy_link(title: str) -> str:
-    """Generate search link for Hellspy."""
-    # Example: https://hellspy.to/?query=stranger%20things
-    return f"https://hellspy.to/?query={urllib.parse.quote(title)}"
+async def get_hellspy_video_url(title: str, episode_title: str = None) -> str:
+    """Search Hellspy and return the first result URL."""
+    query = title
+    if episode_title:
+        # Try to extract S01E01 pattern if possible or just use title
+        query = f"{title} {episode_title}"
+    
+    search_url = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
+    try:
+        async with aiohttp.ClientSession(headers=HEADERS) as session:
+            async with session.get(search_url, timeout=10) as resp:
+                if resp.status != 200:
+                    return search_url
+                html = await resp.text()
+                soup = BeautifulSoup(html, "html.parser")
+                # First video link usually follows this pattern in their HTML
+                first_result = soup.select_one("a[href*='/video/']")
+                if first_result:
+                    link = first_result["href"]
+                    return f"https://hellspy.to{link}" if link.startswith("/") else link
+    except Exception as e:
+        _LOGGER.debug("Hellspy direct search failed: %s", e)
+    
+    return search_url
 
 def get_recommendations(watched_data: dict, all_movies: dict) -> list:
     """Simple recommendation engine based on genres."""
