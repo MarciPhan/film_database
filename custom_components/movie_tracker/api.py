@@ -99,44 +99,41 @@ class CSFDScraper:
                         "episodes": []
                     }
 
-                    # --- EPISODES FETCHING ---
+                    # --- EPISODES FETCHING (TMDb is priority) ---
                     if is_series:
                         _LOGGER.debug("Fetching episodes for series: %s", title)
-                        # Multi-level fallback for episodes
-                        for provider in ["serialzone", "kinobox", "tmdb"]:
-                            if details["episodes"]: break
-                            _LOGGER.debug("Trying provider: %s", provider)
-                            try:
-                                if provider == "serialzone":
-                                    # Search SerialZone
-                                    search_url = f"https://www.serialzone.cz/hledani/?q={urllib.parse.quote(title)}"
-                                    async with session.get(search_url, timeout=5) as sz_resp:
-                                        if sz_resp.status == 200:
-                                            sz_html = await sz_resp.text()
-                                            match = re.search(r'href="(/serial/[^/]+/)', sz_html)
-                                            if match:
-                                                ep_url = f"https://www.serialzone.cz{match.group(1)}epizody/"
-                                                async with session.get(ep_url, timeout=5) as ep_resp:
-                                                    if ep_resp.status == 200:
-                                                        ep_html = await ep_resp.text()
-                                                        ep_matches = re.findall(r'href="(/epizoda/[^"]+)">(.*?)</a>', ep_html)
-                                                        for href, ep_title in ep_matches:
-                                                            if ep_title and "<" not in ep_title:
-                                                                details["episodes"].append({"title": ep_title.strip(), "url": f"https://www.serialzone.cz{href}"})
-                                
-                                elif provider == "tmdb":
-                                    # Use TMDb for posters as a side effect
-                                    tmdb_search = f"https://api.themoviedb.org/3/search/tv?api_key=fba01042790176412f7161b9a953e5e0&query={urllib.parse.quote(title)}&language=cs-CZ"
-                                    async with session.get(tmdb_search, timeout=5) as tmdb_resp:
-                                        if tmdb_resp.status == 200:
-                                            tmdb_data = await tmdb_resp.json()
-                                            if tmdb_data.get("results"):
-                                                res = tmdb_data["results"][0]
-                                                if not details["poster"] or "placeholder" in details["poster"]:
-                                                    details["poster"] = f"https://image.tmdb.org/t/p/w500{res.get('poster_path')}"
-                            except Exception as e:
-                                _LOGGER.debug("Provider %s failed: %s", provider, e)
-                                continue
+                        try:
+                            # Use TMDb - it's the most reliable
+                            tmdb_search = f"https://api.themoviedb.org/3/search/tv?api_key=fba01042790176412f7161b9a953e5e0&query={urllib.parse.quote(title)}&language=cs-CZ"
+                            async with session.get(tmdb_search, timeout=5) as tmdb_resp:
+                                if tmdb_resp.status == 200:
+                                    tmdb_data = await tmdb_resp.json()
+                                    if tmdb_data.get("results"):
+                                        tmdb_id = tmdb_data["results"][0]["id"]
+                                        # Now get ALL seasons and episodes
+                                        details_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key=fba01042790176412f7161b9a953e5e0&language=cs-CZ"
+                                        async with session.get(details_url, timeout=5) as det_resp:
+                                            if det_resp.status == 200:
+                                                full_data = await det_resp.json()
+                                                for season in full_data.get("seasons", []):
+                                                    s_num = season.get("season_number")
+                                                    if s_num == 0: continue # Skip specials
+                                                    # Get episodes for this season
+                                                    s_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{s_num}?api_key=fba01042790176412f7161b9a953e5e0&language=cs-CZ"
+                                                    async with session.get(s_url, timeout=5) as s_resp:
+                                                        if s_resp.status == 200:
+                                                            s_data = await s_resp.json()
+                                                            for ep in s_data.get("episodes", []):
+                                                                details["episodes"].append({
+                                                                    "title": f"S{s_num}E{ep.get('episode_number')} - {ep.get('name')}",
+                                                                    "url": f"https://www.themoviedb.org/tv/{tmdb_id}/season/{s_num}/episode/{ep.get('episode_number')}"
+                                                                })
+                                        
+                                        # Update poster from TMDb too
+                                        if tmdb_data["results"][0].get("poster_path"):
+                                            details["poster"] = f"https://image.tmdb.org/t/p/w500{tmdb_data['results'][0]['poster_path']}"
+                        except Exception as e:
+                            _LOGGER.debug("TMDb episodes failed: %s", e)
 
                     return details
         except Exception as e:
