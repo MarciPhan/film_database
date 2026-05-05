@@ -675,48 +675,58 @@ class MovieTrackerPanel extends LitElement {
 
             <p class="plot">${m.description || 'K tomuto titulu zatím není k dispozici žádný popis.'}</p>
 
-            <div class="actions">
-              <a href="${m.hellspy_url}" target="_blank" class="btn btn-primary" style="text-decoration:none">
-                <ha-icon icon="mdi:play"></ha-icon> Sledovat
+            <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px;">
+              <a href="${m.hellspy_url}" target="_blank" class="btn btn-primary" style="text-decoration:none; grid-column: span 2; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                <ha-icon icon="mdi:play" style="margin-right: 8px; --mdc-icon-size: 28px;"></ha-icon> Sledovat
               </a>
               
+              <div style="grid-column: span 2; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 20px;">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <span style="font-weight: 700; color: var(--text-dim)">Vaše hodnocení</span>
+                  <span style="color:var(--primary); font-weight: 800;">${m.user_rating ? '⭐'.repeat(m.user_rating) : 'Zatím nehodnoceno'}</span>
+                </div>
+                <div style="display:flex; justify-content: center; gap: 12px;">
+                  ${[1,2,3,4,5].map(num => html`
+                    <ha-icon 
+                      icon="${m.user_rating >= num ? 'mdi:star' : 'mdi:star-outline'}"
+                      style="cursor:pointer; color: ${m.user_rating >= num ? 'var(--primary)' : 'var(--text-dim)'}; --mdc-icon-size: 36px; transition: transform 0.2s"
+                      @click=${() => this._action('rate', m, { rating: num })}
+                      @mouseenter=${e => e.target.style.transform = 'scale(1.2)'}
+                      @mouseleave=${e => e.target.style.transform = 'scale(1)'}
+                    ></ha-icon>
+                  `)}
+                </div>
+              </div>
+
               ${!isWatched ? html`
-                <button class="btn btn-secondary" @click=${() => this._action('watch', m)}>
+                <button class="btn btn-secondary" style="height: 50px;" @click=${() => this._action('watch', m)}>
                   <ha-icon icon="mdi:check"></ha-icon> Shlédnuto
                 </button>
               ` : html`
-                <div style="margin: 20px 0; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 16px;">
-                  <div style="margin-bottom: 12px; font-weight: 700; display:flex; justify-content: space-between">
-                    <span>Vaše hodnocení:</span>
-                    <span style="color:var(--primary)">${m.user_rating ? '⭐'.repeat(m.user_rating) : 'Zatím nehodnoceno'}</span>
-                  </div>
-                  <div style="display:flex; gap: 8px;">
-                    ${[1,2,3,4,5].map(num => html`
-                      <button 
-                        style="background: ${m.user_rating >= num ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}; border:none; border-radius: 8px; width: 40px; height: 40px; color: white; cursor:pointer"
-                        @click=${() => this._action('rate', m, { rating: num })}
-                      >${num}</button>
-                    `)}
-                  </div>
-                </div>
-                 <button class="btn btn-secondary" style="color:var(--danger)" @click=${() => this._action('delete_watched', m)}>
-                  <ha-icon icon="mdi:delete"></ha-icon> Smazat ze shlédnutých
+                 <button class="btn btn-secondary" style="height: 50px; color:var(--danger)" @click=${() => this._action('delete_watched', m)}>
+                  <ha-icon icon="mdi:delete"></ha-icon> Odebrat
                 </button>
               `}
 
               ${!isWatched && !isWishlist ? html`
-                <button class="btn btn-secondary" @click=${() => this._action('wishlist', m)}>
-                  <ha-icon icon="mdi:heart-outline"></ha-icon> Do wishlistu
+                <button class="btn btn-secondary" style="height: 50px;" @click=${() => this._action('wishlist', m)}>
+                  <ha-icon icon="mdi:heart-outline"></ha-icon> Wishlist
                 </button>
               ` : (isWishlist ? html`
-                 <button class="btn btn-secondary" style="color:var(--danger)" @click=${() => this._action('delete_wishlist', m)}>
-                  <ha-icon icon="mdi:delete"></ha-icon> Smazat z wishlistu
+                 <button class="btn btn-secondary" style="height: 50px; color:var(--danger)" @click=${() => this._action('delete_wishlist', m)}>
+                  <ha-icon icon="mdi:delete"></ha-icon> Z wishlistu
                 </button>
-              ` : '')}
-              
-              <a href="${m.url}" target="_blank" class="btn btn-secondary">
-                <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
-              </a>
+              ` : html`
+                 <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
+                  <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
+                </a>
+              `)}
+
+              ${!isWatched || isWishlist ? html`
+                <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
+                  <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
+                </a>
+              ` : ''}
             </div>
           </div>
         </div>

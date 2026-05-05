@@ -102,10 +102,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=tmdb_key)
                 if details:
                     lang = data.get("settings", {}).get("language", "CZ")
-                    # Add Hellspy search link
-                    query_text = details.get("title", title)
-                    if lang == "CZ": query_text += " cz dabing"
-                    details["hellspy_url"] = f"https://hellspy.to/?query={urllib.parse.quote(query_text)}"
+                    # Get direct video link from Hellspy
+                    details["hellspy_url"] = await get_hellspy_video_url(query_text, lang)
                     return web.json_response(details)
                 return web.json_response({"error": "Movie not found"}, status=404)
             except Exception as e:
