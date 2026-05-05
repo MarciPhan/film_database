@@ -124,18 +124,14 @@ class DetailView(HomeAssistantView):
             return web.json_response({"error": str(e)}, status=500)
 
 # --- HTTP Views ---
-class MovieTrackerPanelJsView(HomeAssistantView):
-    """Serve the frontend panel JavaScript."""
-    url = "/movie_tracker_static/panel.js"
-    name = "api:movie_tracker:panel"
-    requires_auth = False
-
-    async def get(self, request):
-        from aiohttp import web
-        path = os.path.join(os.path.dirname(__file__), "www", "panel.js")
-        if not os.path.isfile(path):
-            return web.Response(status=404, text="panel.js not found")
-        return web.FileResponse(path, headers={"Cache-Control": "no-cache"}, content_type="application/javascript")
+# --- Static Paths ---
+async def async_setup_static_path(hass: HomeAssistant):
+    """Register static path for the panel."""
+    hass.http.register_static_path(
+        "/movie_tracker_static",
+        os.path.join(os.path.dirname(__file__), "www"),
+        cache_headers=False
+    )
 
 async def async_setup(hass: HomeAssistant, config: dict):
     return True
@@ -164,9 +160,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             "store": store
         }
 
+        # Register static path
+        await async_setup_static_path(hass)
+
         # Register views
         views = [
-            MovieTrackerPanelJsView(),
             DataView(data, tmdb_key),
             SearchView(tmdb_key),
             DetailView(data, tmdb_key),
