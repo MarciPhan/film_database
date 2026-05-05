@@ -485,7 +485,7 @@ class MovieTrackerPanel extends LitElement {
 
         <div class="tabs">
           <div class="tab ${this.tab === 'dashboard' ? 'active' : ''}" @click=${() => this.tab = 'dashboard'}>Přehled</div>
-          <div class="tab ${this.tab === 'library' ? 'active' : ''}" @click=${() => this.tab = 'library'}>Moje Knihovna</div>
+          <div class="tab ${this.tab === 'library' ? 'active' : ''}" @click=${() => this.tab = 'library'}>Shlédnuto</div>
           <div class="tab ${this.tab === 'wishlist' ? 'active' : ''}" @click=${() => this.tab = 'wishlist'}>Wishlist</div>
         </div>
 
@@ -519,7 +519,7 @@ class MovieTrackerPanel extends LitElement {
              </div>
           ` : ''}
           
-          <h3 style="margin-bottom: 20px;">🍿 Nedávno shlédnuté</h3>
+          <h3 style="margin-bottom: 20px;">🍿 Shlédnuto</h3>
           ${watched.length === 0 ? html`
             <div class="empty-state">
               <ha-icon icon="mdi:movie-open-play"></ha-icon>

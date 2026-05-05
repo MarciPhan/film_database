@@ -75,7 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             query = request.query.get("q", "")
             if not query:
                 return web.json_response([])
-            results = await CSFDScraper.search(query)
+            results = await CSFDScraper.search(query, tmdb_api_key=tmdb_key)
             return web.json_response(results)
 
     tmdb_key = entry.data.get("tmdb_api_key", "")

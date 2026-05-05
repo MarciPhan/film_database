@@ -68,8 +68,8 @@ class CSFDScraper:
     """Helper to get movie data using CZDB API."""
 
     @staticmethod
-    async def search(query: str) -> list:
-        """Search for movies/series using CZDB API."""
+    async def search(query: str, tmdb_api_key: str = None) -> list:
+        """Search for movies/series using CZDB API and optional TMDb posters."""
         url = f"{CZDB_BASE_URL}/search?q={urllib.parse.quote(query)}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -94,15 +94,27 @@ class CSFDScraper:
                             "seriál" in alt.lower()
                         )
                         
-                        image = item.get("obrazek_url") or item.get("imgo") or ""
+                        poster = item.get("obrazek_url") or item.get("imgo") or ""
                         
+                        # Enhancement: Fetch better poster from TMDb if key is available
+                        if tmdb_api_key:
+                            try:
+                                t_type = "tv" if is_series else "movie"
+                                t_url = f"https://api.themoviedb.org/3/search/{t_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(title)}&language=cs-CZ"
+                                async with session.get(t_url, timeout=2) as t_resp:
+                                    if t_resp.status == 200:
+                                        t_data = await t_resp.json()
+                                        if t_data.get("results") and t_data["results"][0].get("poster_path"):
+                                            poster = f"https://image.tmdb.org/t/p/w342{t_data['results'][0]['poster_path']}"
+                            except: pass
+
                         results.append({
                             "id": str(item.get("id")),
                             "csfd_id": str(item.get("csfd_id")),
                             "title": title,
                             "year": str(item.get("rok", "N/A")),
                             "url": item.get("csfd_url"),
-                            "poster": image,
+                            "poster": poster,
                             "type": "series" if is_series else "movie"
                         })
                     return results[:20]
