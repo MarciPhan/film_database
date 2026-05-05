@@ -183,6 +183,16 @@ class MovieTrackerPanel extends LitElement {
         padding: 24px;
       }
 
+      .episode-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.2s;
+        gap: 12px;
+      }
+
       header {
         display: flex;
         justify-content: space-between;
@@ -405,21 +415,45 @@ class MovieTrackerPanel extends LitElement {
       }
 
       .modal-content {
-        background: #1e293b;
-        border-radius: 24px;
-        max-width: 900px;
-        width: 100%;
+        background: var(--bg-color);
+        width: 95%;
+        max-width: 1000px;
         max-height: 90vh;
-        overflow-y: auto;
+        border-radius: 28px;
         display: grid;
         grid-template-columns: 350px 1fr;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         border: 1px solid var(--border-color);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       }
 
       @media (max-width: 768px) {
-        .modal-content { grid-template-columns: 1fr; }
-        .modal-poster { height: 300px; }
+        .modal-content {
+          grid-template-columns: 1fr;
+          max-height: 95vh;
+          overflow-y: auto;
+        }
+        .modal-poster {
+          height: 300px;
+          width: 100%;
+          object-fit: cover;
+        }
+        .modal-details {
+          padding: 20px;
+        }
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        .search-box {
+          margin: 10px 0;
+        }
+        .tabs {
+          overflow-x: auto;
+          white-space: nowrap;
+          padding-bottom: 8px;
+        }
       }
 
       .modal-poster {
@@ -427,7 +461,7 @@ class MovieTrackerPanel extends LitElement {
         height: 100%;
         max-height: 90vh;
         object-fit: contain;
-        background: #0a0f18;
+        background: #05080d;
       }
 
       .modal-details {
