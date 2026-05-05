@@ -18,6 +18,8 @@ from .api import CSFDScraper, get_hellspy_video_url, get_recommendations
 
 from aiohttp import web
 
+_LOGGER = logging.getLogger(__name__)
+
 class DataView(HomeAssistantView):
     url = "/api/movie_tracker/data"
     name = "api:movie_tracker:data"
