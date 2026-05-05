@@ -132,6 +132,8 @@ class MovieTrackerPanel extends LitElement {
     }
   }
 
+  async _action(action, movie, extra = {}) {
+    try {
       if (action === 'not_interested') {
         this._dismissedIds.add(movie.id);
         this.requestUpdate();
@@ -627,8 +629,6 @@ class MovieTrackerPanel extends LitElement {
         transform: translateY(-2px);
         box-shadow: 0 15px 30px -5px rgba(139, 92, 246, 0.6);
         filter: brightness(1.1);
-      }
-        gap: 8px;
       }
 
       .btn-primary { background: var(--primary); color: white; }

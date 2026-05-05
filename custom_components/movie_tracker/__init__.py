@@ -146,6 +146,9 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         data = await store.async_load() or {}
         
+        async def _save():
+            await store.async_save(data)
+        
         # Ensure structure
         data.setdefault("watched", {})
         data.setdefault("wishlist", {})

@@ -347,7 +347,7 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                 "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
                                 "poster": poster,
-                                "type": item.get("media_type", "movie"),
+                                "type": "series" if item.get("media_type") == "tv" else "movie",
                                 "description": item.get("overview", "")
                             })
             except: pass
