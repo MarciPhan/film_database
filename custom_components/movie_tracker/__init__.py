@@ -140,24 +140,38 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         await store.async_save(data)
         hass.bus.async_fire(EVENT_MOVIES_UPDATED)
 
+    # Store data for views
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = {
+        "data": data,
+        "tmdb_key": tmdb_key,
+        "store": store
+    }
+
     # --- HTTP Views ---
-    static_path = os.path.join(os.path.dirname(__file__), "www")
-    hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
+    # Register static path only once
+    if not any(v.url == "/movie_tracker_static" for v in hass.http.app.router.routes()):
+        static_path = os.path.join(os.path.dirname(__file__), "www")
+        hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
 
-    hass.http.register_view(DataView(data, tmdb_key))
-    hass.http.register_view(SearchView(tmdb_key))
-    hass.http.register_view(DetailView(data, tmdb_key))
-    hass.http.register_view(ProxyImageView())
-    hass.http.register_view(DiscoverView(tmdb_key))
-
-    # Register platforms
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
-    )
+    # Register views
+    views = [
+        DataView(data, tmdb_key),
+        SearchView(tmdb_key),
+        DetailView(data, tmdb_key),
+        ProxyImageView(),
+        DiscoverView(tmdb_key)
+    ]
+    for view in views:
+        try:
+            hass.http.register_view(view)
+        except Exception:
+            pass # Already registered
 
     # --- Services ---
-
     async def handle_movie_action(call: ServiceCall):
+        action = call.data.get("action")
+        movie = call.data.get("movie", {})
         movie_id = str(movie.get("id") or movie.get("csfd_id") or uuid.uuid4())
         
         if action == "not_interested":
@@ -258,27 +272,34 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         await _save()
         hass.bus.async_fire(EVENT_MOVIES_UPDATED)
 
-    hass.services.async_register(DOMAIN, "movie_action", handle_movie_action)
+    if not hass.services.has_service(DOMAIN, "movie_action"):
+        hass.services.async_register(DOMAIN, "movie_action", handle_movie_action)
 
     # --- Register Panel ---
-    try:
-        from homeassistant.components.frontend import async_register_built_in_panel
-        async_register_built_in_panel(
-            hass,
-            component_name="custom",
-            sidebar_title="Filmotéka",
-            sidebar_icon="mdi:movie-roll",
-            frontend_url_path="movie-tracker",
-            config={
-                "_panel_custom": {
-                    "name": "movie-tracker-panel",
-                    "module_url": f"/movie_tracker_static/panel.js?v={int(time.time())}",
-                }
-            },
-            require_admin=False,
-        )
-    except Exception as exc:
-        _LOGGER.error("Failed to register movie tracker panel: %s", exc)
+    if "movie-tracker" not in hass.data.get("frontend_panels", {}):
+        try:
+            from homeassistant.components.frontend import async_register_built_in_panel
+            async_register_built_in_panel(
+                hass,
+                component_name="custom",
+                sidebar_title="Filmotéka",
+                sidebar_icon="mdi:movie-roll",
+                frontend_url_path="movie-tracker",
+                config={
+                    "_panel_custom": {
+                        "name": "movie-tracker-panel",
+                        "module_url": f"/movie_tracker_static/panel.js?v={int(time.time())}",
+                    }
+                },
+                require_admin=False,
+            )
+        except Exception as exc:
+            _LOGGER.error("Failed to register movie tracker panel: %s", exc)
+
+    # Register platforms
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+    )
 
     return True
 
