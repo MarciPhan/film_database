@@ -154,24 +154,23 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             "store": store
         }
 
-        # --- HTTP Views ---
-        if not _STATIC_REGISTERED:
-            static_path = os.path.join(os.path.dirname(__file__), "www")
-            try:
-                # Try legacy API first
-                hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
-            except AttributeError:
-                # New HA API (2024.11+)
-                try:
-                    await hass.http.async_register_static_paths([
-                        StaticPathConfig("/movie_tracker_static", static_path, False)
-                    ])
-                except Exception as static_err:
-                    _LOGGER.error("Failed to register static path: %s", static_err)
-            _STATIC_REGISTERED = True
+# --- HTTP Views ---
+class MovieTrackerPanelJsView(HomeAssistantView):
+    """Serve the frontend panel JavaScript."""
+    url = "/movie_tracker_static/panel.js"
+    name = "api:movie_tracker:panel"
+    requires_auth = False
+
+    async def get(self, request):
+        from aiohttp import web
+        path = os.path.join(os.path.dirname(__file__), "www", "panel.js")
+        if not os.path.isfile(path):
+            return web.Response(status=404, text="panel.js not found")
+        return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
 
         # Register views
         views = [
+            MovieTrackerPanelJsView(),
             DataView(data, tmdb_key),
             SearchView(tmdb_key),
             DetailView(data, tmdb_key),
