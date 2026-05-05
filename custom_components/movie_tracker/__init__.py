@@ -14,7 +14,7 @@ from homeassistant.components.http import HomeAssistantView
 import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION, EVENT_MOVIES_UPDATED
-from .api import CSFDScraper, get_hellspy_video_url, get_recommendations
+from .api import search_movies, get_details, get_hellspy_video_url, get_recommendations
 
 from aiohttp import web
 
@@ -53,8 +53,8 @@ class SearchView(HomeAssistantView):
     async def get(self, request):
         query = request.query.get("q", "")
         if not query: return web.json_response([])
-        from .api import CSFDScraper
-        results = await CSFDScraper.search(query, tmdb_api_key=self._tmdb_key)
+        from .api import search_movies
+        results = await search_movies(query, tmdb_api_key=self._tmdb_key)
         return web.json_response(results)
 
 class ProxyImageView(HomeAssistantView):
@@ -111,8 +111,8 @@ class DetailView(HomeAssistantView):
         title = request.query.get("title", "")
         if not movie_id and not title: return web.json_response({"error": "Missing ID or Title"}, status=400)
         try:
-            from .api import CSFDScraper, get_hellspy_video_url
-            details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=self._tmdb_key)
+            from .api import get_details, get_hellspy_video_url
+            details = await get_details(title, tmdb_api_key=self._tmdb_key)
             if details:
                 lang = self._data.get("settings", {}).get("language", "CZ")
                 query_text = details.get("title", title)
@@ -123,52 +123,56 @@ class DetailView(HomeAssistantView):
             _LOGGER.error("Error in DetailView: %s", e, exc_info=True)
             return web.json_response({"error": str(e)}, status=500)
 
+_STATIC_REGISTERED = False
+
 async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry):
     """Set up Movie Tracker from a config entry."""
-    store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-    data = await store.async_load() or {}
-    
-    # Ensure structure
-    data.setdefault("watched", {})
-    data.setdefault("wishlist", {})
-    data.setdefault("settings", {"language": "CZ"})
-    
-    tmdb_key = entry.data.get("tmdb_api_key", "")
-    
-    async def _save():
-        await store.async_save(data)
-        hass.bus.async_fire(EVENT_MOVIES_UPDATED)
+    global _STATIC_REGISTERED
+    try:
+        store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        data = await store.async_load() or {}
+        
+        # Ensure structure
+        data.setdefault("watched", {})
+        data.setdefault("wishlist", {})
+        data.setdefault("settings", {"language": "CZ"})
+        
+        tmdb_key = entry.data.get("tmdb_api_key", "")
+        
+        async def _save():
+            await store.async_save(data)
+            hass.bus.async_fire(EVENT_MOVIES_UPDATED)
 
-    # Store data for views
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        "data": data,
-        "tmdb_key": tmdb_key,
-        "store": store
-    }
+        # Store data for views
+        hass.data.setdefault(DOMAIN, {})
+        hass.data[DOMAIN][entry.entry_id] = {
+            "data": data,
+            "tmdb_key": tmdb_key,
+            "store": store
+        }
 
-    # --- HTTP Views ---
-    # Register static path only once
-    if not any(v.url == "/movie_tracker_static" for v in hass.http.app.router.routes()):
-        static_path = os.path.join(os.path.dirname(__file__), "www")
-        hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
+        # --- HTTP Views ---
+        if not _STATIC_REGISTERED:
+            static_path = os.path.join(os.path.dirname(__file__), "www")
+            hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
+            _STATIC_REGISTERED = True
 
-    # Register views
-    views = [
-        DataView(data, tmdb_key),
-        SearchView(tmdb_key),
-        DetailView(data, tmdb_key),
-        ProxyImageView(),
-        DiscoverView(tmdb_key)
-    ]
-    for view in views:
-        try:
-            hass.http.register_view(view)
-        except Exception:
-            pass # Already registered
+        # Register views
+        views = [
+            DataView(data, tmdb_key),
+            SearchView(tmdb_key),
+            DetailView(data, tmdb_key),
+            ProxyImageView(),
+            DiscoverView(tmdb_key)
+        ]
+        for view in views:
+            try:
+                hass.http.register_view(view)
+            except Exception:
+                pass # Already registered
 
     # --- Services ---
     async def handle_movie_action(call: ServiceCall):
