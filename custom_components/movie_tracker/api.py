@@ -11,31 +11,6 @@ _LOGGER = logging.getLogger(__name__)
 # CZDB API configuration
 CZDB_BASE_URL = "https://api.czdb.cz"
 
-async def search_movies(query: str, tmdb_api_key: str = None) -> list:
-    """Search for movies and TV shows using TMDb."""
-    if not tmdb_api_key: return []
-    url = f"https://api.themoviedb.org/3/search/multi?api_key={tmdb_api_key}&query={urllib.parse.quote(query)}&language=cs-CZ"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=5) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                results = []
-                for item in data.get("results", []):
-                    m_type = item.get("media_type")
-                    if m_type not in ["movie", "tv"]: continue
-                    title = item.get("title") or item.get("name")
-                    poster_path = item.get("poster_path")
-                    poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w185' + poster_path)}" if poster_path else ""
-                    results.append({
-                        "id": str(item["id"]),
-                        "title": title,
-                        "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
-                        "type": "series" if m_type == "tv" else "movie",
-                        "poster": poster
-                    })
-                return results
-    return []
-
 class SerialZoneScraper:
     """Helper to scrape episodes from SerialZone.cz."""
     BASE_URL = "https://www.serialzone.cz"
@@ -347,7 +322,7 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                 "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
                                 "poster": poster,
-                                "type": "series" if item.get("media_type") == "tv" else "movie",
+                                "type": item.get("media_type", "movie"),
                                 "description": item.get("overview", "")
                             })
             except: pass
