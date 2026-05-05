@@ -157,7 +157,16 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         # --- HTTP Views ---
         if not _STATIC_REGISTERED:
             static_path = os.path.join(os.path.dirname(__file__), "www")
-            hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
+            # Handle new HA API
+            if hasattr(hass.http, "async_register_static_paths"):
+                # Newer HA versions
+                from homeassistant.components.http.static import StaticPathConfig
+                hass.http.async_register_static_paths([
+                    StaticPathConfig("/movie_tracker_static", static_path, False)
+                ])
+            else:
+                # Older HA versions
+                hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
             _STATIC_REGISTERED = True
 
         # Register views
