@@ -127,6 +127,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 if details:
                     lang = data.get("settings", {}).get("language", "CZ")
                     # Get direct video link from Hellspy
+                    query_text = details.get("title", title)
                     details["hellspy_url"] = await get_hellspy_video_url(query_text, lang)
                     return web.json_response(details)
                 return web.json_response({"error": "Movie not found"}, status=404)
