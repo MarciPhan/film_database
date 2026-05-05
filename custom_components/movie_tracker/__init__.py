@@ -16,27 +16,126 @@ import homeassistant.util.dt as dt_util
 from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION, EVENT_MOVIES_UPDATED
 from .api import CSFDScraper, get_hellspy_video_url, get_recommendations
 
-_LOGGER = logging.getLogger(__name__)
+from aiohttp import web
+
+class DataView(HomeAssistantView):
+    url = "/api/movie_tracker/data"
+    name = "api:movie_tracker:data"
+    requires_auth = True
+
+    def __init__(self, data, tmdb_key):
+        self._data = data
+        self._tmdb_key = tmdb_key
+
+    async def get(self, request):
+        try:
+            from .api import get_recommendations
+            recommendations = await get_recommendations(self._data["watched"], self._data["wishlist"], tmdb_api_key=self._tmdb_key, not_interested=self._data.get("not_interested", {}))
+            return web.json_response({
+                "watched": self._data["watched"],
+                "wishlist": self._data["wishlist"],
+                "settings": self._data["settings"],
+                "not_interested": self._data.get("not_interested", {}),
+                "recommendations": recommendations
+            })
+        except Exception as e:
+            _LOGGER.error("Error in DataView: %s", e, exc_info=True)
+            return web.json_response({"error": str(e)}, status=500)
+
+class SearchView(HomeAssistantView):
+    url = "/api/movie_tracker/search"
+    name = "api:movie_tracker:search"
+    requires_auth = True
+    def __init__(self, tmdb_key):
+        self._tmdb_key = tmdb_key
+    async def get(self, request):
+        query = request.query.get("q", "")
+        if not query: return web.json_response([])
+        from .api import CSFDScraper
+        results = await CSFDScraper.search(query, tmdb_api_key=self._tmdb_key)
+        return web.json_response(results)
+
+class ProxyImageView(HomeAssistantView):
+    url = "/api/movie_tracker/proxy_image"
+    name = "api:movie_tracker:proxy_image"
+    requires_auth = False
+    async def get(self, request):
+        import hashlib
+        image_url = request.query.get("url")
+        if not image_url: return web.Response(status=400)
+        cache_dir = os.path.join(os.path.dirname(__file__), "www", "posters")
+        os.makedirs(cache_dir, exist_ok=True)
+        url_hash = hashlib.md5(image_url.encode()).hexdigest()
+        ext = image_url.split(".")[-1].split("?")[0] if "." in image_url else "jpg"
+        cache_path = os.path.join(cache_dir, f"{url_hash}.{ext}")
+        if os.path.isfile(cache_path): return web.FileResponse(cache_path)
+        headers = {"Referer": "https://www.csfd.cz/", "User-Agent": "Mozilla/5.0"}
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url, headers=headers, timeout=10) as resp:
+                    if resp.status == 200:
+                        content = await resp.read()
+                        with open(cache_path, "wb") as f: f.write(content)
+                        return web.Response(body=content, content_type=resp.content_type)
+        except Exception as e: _LOGGER.error("Proxy image failed: %s", e)
+        return web.Response(status=404)
+
+class DiscoverView(HomeAssistantView):
+    url = "/api/movie_tracker/discover"
+    name = "api:movie_tracker:discover"
+    requires_auth = True
+    def __init__(self, tmdb_key):
+        self._tmdb_key = tmdb_key
+    async def get(self, request):
+        from .api import get_discover
+        media_type = request.query.get("type", "movie")
+        genre = request.query.get("genre")
+        year = request.query.get("year")
+        try: min_rating = float(request.query.get("rating", 0))
+        except: min_rating = 0
+        results = await get_discover(self._tmdb_key, media_type, genre, year, min_rating)
+        return web.json_response(results)
+
+class DetailView(HomeAssistantView):
+    url = "/api/movie_tracker/detail"
+    name = "api:movie_tracker:detail"
+    requires_auth = True
+    def __init__(self, data, tmdb_key):
+        self._data = data
+        self._tmdb_key = tmdb_key
+    async def get(self, request):
+        movie_id = request.query.get("id", "")
+        title = request.query.get("title", "")
+        if not movie_id and not title: return web.json_response({"error": "Missing ID or Title"}, status=400)
+        try:
+            from .api import CSFDScraper, get_hellspy_video_url
+            details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=self._tmdb_key)
+            if details:
+                lang = self._data.get("settings", {}).get("language", "CZ")
+                query_text = details.get("title", title)
+                details["hellspy_url"] = await get_hellspy_video_url(query_text, lang)
+                return web.json_response(details)
+            return web.json_response({"error": "Movie not found"}, status=404)
+        except Exception as e:
+            _LOGGER.error("Error in DetailView: %s", e, exc_info=True)
+            return web.json_response({"error": str(e)}, status=500)
 
 async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the component from configuration.yaml."""
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry):
     """Set up Movie Tracker from a config entry."""
-    
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     data = await store.async_load() or {}
     
     # Ensure structure
-    data.setdefault("watched", {})  # id -> movie_details
-    data.setdefault("wishlist", {}) # id -> movie_details
-    data.setdefault("history", [])  # list of watch events
-    data.setdefault("settings", {"language": "CZ"}) # User settings
+    data.setdefault("watched", {})
+    data.setdefault("wishlist", {})
+    data.setdefault("settings", {"language": "CZ"})
     
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = data
-
+    tmdb_key = entry.data.get("tmdb_api_key", "")
+    
     async def _save():
         await store.async_save(data)
         hass.bus.async_fire(EVENT_MOVIES_UPDATED)
@@ -45,105 +144,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     static_path = os.path.join(os.path.dirname(__file__), "www")
     hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
 
-    class DataView(HomeAssistantView):
-        url = "/api/movie_tracker/data"
-        name = "api:movie_tracker:data"
-        requires_auth = True
-        async def get(self, request):
-            from aiohttp import web
-            try:
-                tmdb_key = entry.data.get("tmdb_api_key", "")
-                recommendations = await get_recommendations(data["watched"], data["wishlist"], tmdb_api_key=tmdb_key, not_interested=data.get("not_interested", {}))
-                return web.json_response({
-                    "watched": data["watched"],
-                    "wishlist": data["wishlist"],
-                    "settings": data["settings"],
-                    "not_interested": data.get("not_interested", {}),
-                    "recommendations": recommendations
-                })
-            except Exception as e:
-                _LOGGER.error("Error in DataView: %s", e, exc_info=True)
-                return web.json_response({"error": str(e)}, status=500)
-
-    class SearchView(HomeAssistantView):
-        url = "/api/movie_tracker/search"
-        name = "api:movie_tracker:search"
-        requires_auth = True
-        async def get(self, request):
-            from aiohttp import web
-            query = request.query.get("q", "")
-            if not query: return web.json_response([])
-            results = await CSFDScraper.search(query, tmdb_api_key=tmdb_key)
-            return web.json_response(results)
-
-    class ProxyImageView(HomeAssistantView):
-        url = "/api/movie_tracker/proxy_image"
-        name = "api:movie_tracker:proxy_image"
-        requires_auth = False
-        async def get(self, request):
-            from aiohttp import web
-            import hashlib
-            image_url = request.query.get("url")
-            if not image_url: return web.Response(status=400)
-            cache_dir = os.path.join(os.path.dirname(__file__), "www", "posters")
-            os.makedirs(cache_dir, exist_ok=True)
-            url_hash = hashlib.md5(image_url.encode()).hexdigest()
-            ext = image_url.split(".")[-1].split("?")[0] if "." in image_url else "jpg"
-            cache_path = os.path.join(cache_dir, f"{url_hash}.{ext}")
-            if os.path.isfile(cache_path): return web.FileResponse(cache_path)
-            headers = {"Referer": "https://www.csfd.cz/", "User-Agent": "Mozilla/5.0"}
-            try:
-                import aiohttp
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(image_url, headers=headers, timeout=10) as resp:
-                        if resp.status == 200:
-                            content = await resp.read()
-                            with open(cache_path, "wb") as f: f.write(content)
-                            return web.Response(body=content, content_type=resp.content_type)
-            except Exception as e: _LOGGER.error("Proxy image failed: %s", e)
-            return web.Response(status=404)
-
-    class DiscoverView(HomeAssistantView):
-        url = "/api/movie_tracker/discover"
-        name = "api:movie_tracker:discover"
-        requires_auth = True
-        async def get(self, request):
-            from aiohttp import web
-            from .api import get_discover
-            media_type = request.query.get("type", "movie")
-            genre = request.query.get("genre")
-            year = request.query.get("year")
-            try: min_rating = float(request.query.get("rating", 0))
-            except: min_rating = 0
-            results = await get_discover(tmdb_key, media_type, genre, year, min_rating)
-            return web.json_response(results)
-
-    class DetailView(HomeAssistantView):
-        url = "/api/movie_tracker/detail"
-        name = "api:movie_tracker:detail"
-        requires_auth = True
-        async def get(self, request):
-            from aiohttp import web
-            movie_id = request.query.get("id", "")
-            title = request.query.get("title", "")
-            if not movie_id and not title: return web.json_response({"error": "Missing ID or Title"}, status=400)
-            try:
-                details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=tmdb_key)
-                if details:
-                    lang = data.get("settings", {}).get("language", "CZ")
-                    query_text = details.get("title", title)
-                    details["hellspy_url"] = await get_hellspy_video_url(query_text, lang)
-                    return web.json_response(details)
-                return web.json_response({"error": "Movie not found"}, status=404)
-            except Exception as e:
-                _LOGGER.error("Error in DetailView: %s", e, exc_info=True)
-                return web.json_response({"error": str(e)}, status=500)
-
-    hass.http.register_view(DataView())
-    hass.http.register_view(SearchView())
-    hass.http.register_view(DetailView())
+    hass.http.register_view(DataView(data, tmdb_key))
+    hass.http.register_view(SearchView(tmdb_key))
+    hass.http.register_view(DetailView(data, tmdb_key))
     hass.http.register_view(ProxyImageView())
-    hass.http.register_view(DiscoverView())
+    hass.http.register_view(DiscoverView(tmdb_key))
 
     # Register platforms
     hass.async_create_task(
