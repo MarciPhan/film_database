@@ -244,8 +244,15 @@ async def get_discover(tmdb_api_key: str, media_type: str = "movie", genre_id: s
                 return results
     return []
 
-async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str) -> list:
+async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str, not_interested: dict = None) -> list:
     """Generate recommendations based on history, ratings and wishlist."""
+    import time
+    now = time.time()
+    # Filter valid not_interested IDs
+    ni_ids = set()
+    if not_interested:
+        ni_ids = {m_id for m_id, expire in not_interested.items() if expire > now}
+
     # 1. Get wishlist items
     wishlist = list(wishlist_data.values())
     
@@ -278,6 +285,7 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                         r_data = await r_resp.json()
                                         for item in r_data.get("results", [])[:3]:
                                             r_id = f"tmdb_{item['id']}"
+                                            if r_id in ni_ids: continue
                                             r_title = item.get("title") or item.get("name")
                                             if r_title.lower() in [w["title"].lower() for w in watched_data.values()]: continue
                                             if r_title.lower() in [w["title"].lower() for w in wishlist_data.values()]: continue
@@ -302,6 +310,7 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                         t_data = await resp.json()
                         for item in t_data.get("results", [])[:10]:
                             r_id = f"tmdb_{item['id']}"
+                            if r_id in ni_ids: continue
                             r_title = item.get("title") or item.get("name")
                             if r_title.lower() in [w["title"].lower() for w in watched_data.values()]: continue
                             if r_title.lower() in [w["title"].lower() for w in wishlist_data.values()]: continue

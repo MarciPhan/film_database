@@ -64,13 +64,13 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             # or just serve raw data
             # Get recommendations based on watched history
             tmdb_key = entry.data.get("tmdb_api_key", "")
-            recommendations = await get_recommendations(data["watched"], data["wishlist"], tmdb_api_key=tmdb_key)
+            recommendations = await get_recommendations(data["watched"], data["wishlist"], tmdb_api_key=tmdb_key, not_interested=data.get("not_interested", {}))
             
             return web.json_response({
                 "watched": data["watched"],
                 "wishlist": data["wishlist"],
                 "settings": data["settings"],
-                "not_interested": data.get("not_interested", []),
+                "not_interested": data.get("not_interested", {}),
                 "recommendations": recommendations
             })
 
@@ -189,7 +189,13 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     async def handle_movie_action(call: ServiceCall):
         movie_id = str(movie.get("id") or movie.get("csfd_id") or uuid.uuid4())
         
-        if action == "watch":
+        if action == "not_interested":
+            import time
+            if "not_interested" not in data:
+                data["not_interested"] = {}
+            # Hide for 30 days
+            data["not_interested"][movie_id] = time.time() + (30 * 24 * 3600)
+        elif action == "watch":
             # Get existing data if possible to preserve seasons/details
             existing = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
             if existing:

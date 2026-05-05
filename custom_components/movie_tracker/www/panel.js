@@ -132,11 +132,9 @@ class MovieTrackerPanel extends LitElement {
     }
   }
 
-  async _action(action, movie, extra = {}) {
       if (action === 'not_interested') {
         this._dismissedIds.add(movie.id);
         this.requestUpdate();
-        return;
       }
 
       await this._svc("movie_action", { action, movie, ...extra });
@@ -750,7 +748,10 @@ class MovieTrackerPanel extends LitElement {
         
         <div class="grid" style="margin-bottom: 48px;">
           ${(() => {
-            const filtered = (this.data.recommendations || []).filter(m => !this._dismissedIds.has(m.id));
+            const serverDismissed = Object.keys(this.data.not_interested || {});
+            const filtered = (this.data.recommendations || []).filter(m => 
+              !this._dismissedIds.has(m.id) && !serverDismissed.includes(m.id)
+            );
             if (!filtered.length) return html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`;
             return filtered.map(m => this._renderMovieCard(m, true));
           })()}
