@@ -152,11 +152,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         movie_id = movie.get("id") or str(uuid.uuid4())
         
         if action == "watch":
-            # If it's a series, we might handle episode marking differently 
-            # but for now let's just mark the movie/series as watched
             data["watched"][movie_id] = movie
             data["watched"][movie_id]["watched_at"] = dt_util.now().isoformat()
-            # Remove from wishlist if present
             data["wishlist"].pop(movie_id, None)
             
         elif action == "wishlist":
@@ -169,20 +166,43 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         elif action == "delete_wishlist":
             data["wishlist"].pop(movie_id, None)
             
-        elif action == "mark_episode":
-            # For series: mark specific episode
-            ep_url = call.data.get("episode_url")
-            if movie_id in data["watched"]:
-                target = data["watched"][movie_id]
-            elif movie_id in data["wishlist"]:
-                target = data["wishlist"][movie_id]
-            else:
+        elif action == "watch_episode":
+            ep_id = call.data.get("episode_id")
+            # Get movie from either list
+            target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
+            if not target:
                 target = movie
                 data["watched"][movie_id] = target
+
+            if "watched_episodes" not in target: target["watched_episodes"] = {}
+            if isinstance(target["watched_episodes"], list): target["watched_episodes"] = {} # Migration
             
-            target.setdefault("watched_episodes", [])
-            if ep_url not in target["watched_episodes"]:
-                target["watched_episodes"].append(ep_url)
+            target["watched_episodes"][ep_id] = target["watched_episodes"].get(ep_id, {})
+            target["watched_episodes"][ep_id]["watched"] = True
+            
+            # If we watch an episode, ensure series is in watched list
+            if movie_id not in data["watched"]:
+                data["watched"][movie_id] = target
+                data["wishlist"].pop(movie_id, None)
+
+        elif action == "rate_episode":
+            ep_id = call.data.get("episode_id")
+            rating = call.data.get("rating")
+            target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
+            if not target:
+                target = movie
+                data["watched"][movie_id] = target
+
+            if "watched_episodes" not in target: target["watched_episodes"] = {}
+            if isinstance(target["watched_episodes"], list): target["watched_episodes"] = {}
+            
+            target["watched_episodes"][ep_id] = target["watched_episodes"].get(ep_id, {})
+            target["watched_episodes"][ep_id]["rating"] = rating
+            target["watched_episodes"][ep_id]["watched"] = True
+            
+            if movie_id not in data["watched"]:
+                data["watched"][movie_id] = target
+                data["wishlist"].pop(movie_id, None)
         
         elif action == "rate":
             rating = call.data.get("rating")

@@ -236,13 +236,20 @@ class CSFDScraper:
                                                                 "name": season.get("name") or f"{s_num}. řada",
                                                                 "episodes": []
                                                             }
-                                                            for ep in e_data.get("episodes", []):
-                                                                season_info["episodes"].append({
-                                                                    "title": ep.get("name"),
-                                                                    "number": ep.get("episode_number"),
-                                                                    "overview": ep.get("overview"),
-                                                                    "url": f"https://www.themoviedb.org/tv/{tmdb_id}/season/{s_num}/episode/{ep.get('episode_number')}"
-                                                                })
+                                                                for ep in e_data.get("episodes", []):
+                                                                    ep_num = ep.get("episode_number")
+                                                                    ep_title = ep.get("name")
+                                                                    # Generate Hellspy link for episode
+                                                                    h_query = f"{details['title']} S{str(s_num).zfill(2)}E{str(ep_num).zfill(2)} cz dabing"
+                                                                    h_url = f"https://hellspy.to/?query={urllib.parse.quote(h_query)}"
+                                                                    
+                                                                    season_info["episodes"].append({
+                                                                        "title": ep_title,
+                                                                        "number": ep_num,
+                                                                        "overview": ep.get("overview"),
+                                                                        "url": h_url,
+                                                                        "id": f"s{s_num}e{ep_num}"
+                                                                    })
                                                             details["seasons"].append(season_info)
                         except Exception as e:
                             _LOGGER.error("TMDb series fetch failed: %s", e)

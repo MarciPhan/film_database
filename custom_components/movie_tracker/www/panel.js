@@ -692,17 +692,45 @@ class MovieTrackerPanel extends LitElement {
                 </div>
                 
                 <div class="episodes-list" style="display: flex; flex-direction: column; gap: 8px;">
-                  ${m.seasons[this.selectedSeason || 0]?.episodes.map(ep => html`
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                      <div style="flex: 1">
-                        <div style="font-weight: 700; font-size: 14px;">${ep.number ? `${ep.number}. ` : ''}${ep.title}</div>
-                        ${ep.overview ? html`<div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${ep.overview}</div>` : ''}
+                  ${m.seasons[this.selectedSeason || 0]?.episodes.map(ep => {
+                    const epData = (this.data.watched[m.id] || this.data.wishlist[m.id])?.watched_episodes?.[ep.id] || {};
+                    const isEpWatched = epData.watched;
+                    const epRating = epData.rating || 0;
+                    
+                    return html`
+                    <div style="background: ${isEpWatched ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isEpWatched ? 'var(--primary)' : 'var(--border-color)'}; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 12px; transition: 0.3s">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                        <div style="flex: 1">
+                          <div style="font-weight: 700; font-size: 14px; display:flex; align-items:center; gap:8px">
+                            ${isEpWatched ? html`<ha-icon icon="mdi:check-circle" style="color:var(--primary); --mdc-icon-size: 18px;"></ha-icon>` : ''}
+                            ${ep.number ? `${ep.number}. ` : ''}${ep.title}
+                          </div>
+                          ${ep.overview ? html`<div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${ep.overview}</div>` : ''}
+                        </div>
+                        <div style="display:flex; gap:8px">
+                           <a href="${ep.url}" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                            <ha-icon icon="mdi:play" style="--mdc-icon-size: 18px;"></ha-icon> Hellspy
+                          </a>
+                           <button class="btn ${isEpWatched ? 'btn-primary' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 12px;" @click=${() => this._action('watch_episode', m, { episode_id: ep.id })}>
+                            <ha-icon icon="${isEpWatched ? 'mdi:eye-off' : 'mdi:eye'}" style="--mdc-icon-size: 18px;"></ha-icon>
+                          </button>
+                        </div>
                       </div>
-                      <a href="${ep.url}" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">
-                        <ha-icon icon="mdi:play" style="--mdc-icon-size: 18px;"></ha-icon> Přehrát
-                      </a>
+                      
+                      <div style="display:flex; align-items:center; gap:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05)">
+                        <span style="font-size: 11px; font-weight:700; color:var(--text-dim)">HODNOCENÍ DÍLU:</span>
+                        <div style="display:flex; gap:4px">
+                          ${[1,2,3,4,5].map(star => html`
+                            <ha-icon 
+                              icon="${epRating >= star ? 'mdi:star' : 'mdi:star-outline'}" 
+                              style="cursor:pointer; color: ${epRating >= star ? 'var(--primary)' : 'var(--text-dim)'}; --mdc-icon-size: 20px;"
+                              @click=${() => this._action('rate_episode', m, { episode_id: ep.id, rating: star })}
+                            ></ha-icon>
+                          `)}
+                        </div>
+                      </div>
                     </div>
-                  `)}
+                  `})}
                 </div>
               </div>
             ` : ''}
