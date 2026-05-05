@@ -69,10 +69,27 @@ class CSFDScraper:
 
     @staticmethod
     async def search(query: str, tmdb_api_key: str = None) -> list:
-        """Search for movies/series using CZDB API and optional TMDb posters."""
+        """Search for movies/series using CZDB API and TMDb for type detection."""
         url = f"{CZDB_BASE_URL}/search?q={urllib.parse.quote(query)}"
         try:
             async with aiohttp.ClientSession() as session:
+                # Priority 1: Use TMDb Multi-search to identify types (if key available)
+                type_map = {}
+                if tmdb_api_key:
+                    try:
+                        t_url = f"https://api.themoviedb.org/3/search/multi?api_key={tmdb_api_key}&query={urllib.parse.quote(query)}&language=cs-CZ"
+                        async with session.get(t_url, timeout=3) as t_resp:
+                            if t_resp.status == 200:
+                                t_data = await t_resp.json()
+                                for item in t_data.get("results", []):
+                                    name = item.get("title") or item.get("name")
+                                    m_type = item.get("media_type")
+                                    if name and m_type in ["tv", "movie"]:
+                                        type_map[name.lower()] = m_type
+                                        if item.get("original_title"): type_map[item["original_title"].lower()] = m_type
+                                        if item.get("original_name"): type_map[item["original_name"].lower()] = m_type
+                    except: pass
+
                 async with session.get(url, timeout=10) as response:
                     if response.status != 200:
                         _LOGGER.warning("CZDB search returned status %s", response.status)
@@ -84,33 +101,36 @@ class CSFDScraper:
                     results = []
                     for item in data.get("results", []):
                         title = item.get("nazev", "Neznámý název")
+                        orig_title = item.get("original", "")
                         alt = item.get("alt_nazev", "")
                         
-                        # Enhanced series detection
-                        is_series = (
-                            item.get("typ") in ["tvSeries", "series", "seriál"] or
-                            item.get("cas") == "N/A" or
-                            "seriál" in title.lower() or
-                            "seriál" in alt.lower()
-                        )
+                        # Type detection from TMDb map first, then heuristics
+                        t_type = type_map.get(title.lower()) or type_map.get(orig_title.lower())
+                        
+                        if t_type:
+                            is_series = t_type == "tv"
+                        else:
+                            # Fallback Heuristics
+                            is_series = (
+                                "seriál" in title.lower() or 
+                                "seriál" in alt.lower() or
+                                "series" in alt.lower() or
+                                any(x in title.lower() for x in [" - řada", " - série"])
+                            )
                         
                         poster = item.get("obrazek_url") or item.get("imgo") or ""
-                        orig_title = item.get("original", "")
                         
-                        # Enhancement: Fetch better poster from TMDb if key is available
+                        # Enhancement: Fetch better poster from TMDb
                         if tmdb_api_key:
                             try:
-                                t_type = "tv" if is_series else "movie"
-                                # Try search with original title first for better match, then Czech
-                                for q_title in [orig_title, title]:
-                                    if not q_title: continue
-                                    t_url = f"https://api.themoviedb.org/3/search/{t_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(q_title)}&language=cs-CZ"
-                                    async with session.get(t_url, timeout=2) as t_resp:
-                                        if t_resp.status == 200:
-                                            t_data = await t_resp.json()
-                                            if t_data.get("results") and t_data["results"][0].get("poster_path"):
-                                                poster = f"https://image.tmdb.org/t/p/w342{t_data['results'][0]['poster_path']}"
-                                                break
+                                t_search_type = "tv" if is_series else "movie"
+                                # Look for the best match in TMDb for poster
+                                t_url = f"https://api.themoviedb.org/3/search/{t_search_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(orig_title or title)}&language=cs-CZ"
+                                async with session.get(t_url, timeout=2) as t_resp:
+                                    if t_resp.status == 200:
+                                        t_data = await t_resp.json()
+                                        if t_data.get("results") and t_data["results"][0].get("poster_path"):
+                                            poster = f"https://image.tmdb.org/t/p/w342{t_data['results'][0]['poster_path']}"
                             except: pass
 
                         # If poster is still from CZDB, use proxy
