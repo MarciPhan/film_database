@@ -999,7 +999,6 @@ class MovieTrackerPanel extends LitElement {
                 ` : '')}
               </div>
             </div>
-              ` : '')}
 
               <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
                 <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
