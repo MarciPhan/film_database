@@ -429,55 +429,61 @@ class MovieTrackerPanel extends LitElement {
       .modal-content {
         background: var(--bg-color);
         width: 95%;
-        max-width: 1000px;
-        max-height: 90vh;
-        border-radius: 28px;
+        max-width: 1100px;
+        height: 80vh;
+        border-radius: 32px;
         display: grid;
-        grid-template-columns: 350px 1fr;
+        grid-template-columns: 400px 1fr;
         overflow: hidden;
         position: relative;
-        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        box-shadow: 0 30px 60px -12px rgba(0,0,0,0.6);
         border: 1px solid var(--border-color);
       }
 
-      @media (max-width: 768px) {
+      @media (max-width: 900px) {
         .modal-content {
           grid-template-columns: 1fr;
-          max-height: 95vh;
+          height: 90vh;
           overflow-y: auto;
         }
         .modal-poster {
-          height: 300px;
+          height: 350px;
           width: 100%;
-          object-fit: cover;
-        }
-        .modal-details {
-          padding: 20px;
-        }
-        .grid {
-          grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
-        }
-        .search-box {
-          margin: 10px 0;
-        }
-        .tabs {
-          overflow-x: auto;
-          white-space: nowrap;
-          padding-bottom: 8px;
         }
       }
 
       .modal-poster {
         width: 100%;
         height: 100%;
-        max-height: 90vh;
-        object-fit: contain;
+        object-fit: cover;
         background: #05080d;
+        border-right: 1px solid var(--border-color);
       }
 
       .modal-details {
         padding: 40px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%);
+        height: 100%;
+        box-sizing: border-box;
+      }
+
+      /* Custom scrollbar for premium look */
+      .modal-details::-webkit-scrollbar {
+        width: 6px;
+      }
+      .modal-details::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .modal-details::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+      }
+      .modal-details::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.2);
       }
 
       .modal-details h2 {
@@ -828,9 +834,9 @@ class MovieTrackerPanel extends LitElement {
               </div>
             ` : ''}
 
-            <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px;">
-              <a href="${m.hellspy_url}" target="_blank" class="btn btn-primary" style="text-decoration:none; grid-column: span 2; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
-                <ha-icon icon="mdi:play" style="margin-right: 8px; --mdc-icon-size: 28px;"></ha-icon> Sledovat
+            <div class="actions" style="margin-top: auto;">
+              <a href="${m.hellspy_url}" target="_blank" class="btn-hero">
+                <ha-icon icon="mdi:play" style="--mdc-icon-size: 28px;"></ha-icon> Sledovat
               </a>
               
               <div style="grid-column: span 2; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 20px;">
