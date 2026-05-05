@@ -33,7 +33,7 @@ class DataView(HomeAssistantView):
         try:
             from .api import get_recommendations
             recommendations = await get_recommendations(self._data["watched"], self._data["wishlist"], tmdb_api_key=self._tmdb_key, not_interested=self._data.get("not_interested", {}))
-            return web.json_response({
+            return aiohttp.web.json_response({
                 "watched": self._data["watched"],
                 "wishlist": self._data["wishlist"],
                 "settings": self._data["settings"],
@@ -42,7 +42,7 @@ class DataView(HomeAssistantView):
             })
         except Exception as e:
             _LOGGER.error("Error in DataView: %s", e, exc_info=True)
-            return web.json_response({"error": str(e)}, status=500)
+            return aiohttp.web.json_response({"error": str(e)}, status=500)
 
 class SearchView(HomeAssistantView):
     url = "/api/movie_tracker/search"
@@ -52,10 +52,10 @@ class SearchView(HomeAssistantView):
         self._tmdb_key = tmdb_key
     async def get(self, request):
         query = request.query.get("q", "")
-        if not query: return web.json_response([])
+        if not query: return aiohttp.web.json_response([])
         from .api import search_movies
         results = await search_movies(query, tmdb_api_key=self._tmdb_key)
-        return web.json_response(results)
+        return aiohttp.web.json_response(results)
 
 class ProxyImageView(HomeAssistantView):
     url = "/api/movie_tracker/proxy_image"
@@ -64,7 +64,7 @@ class ProxyImageView(HomeAssistantView):
     async def get(self, request):
         import hashlib
         image_url = request.query.get("url")
-        if not image_url: return web.Response(status=400)
+        if not image_url: return aiohttp.web.Response(status=400)
         cache_dir = os.path.join(os.path.dirname(__file__), "www", "posters")
         os.makedirs(cache_dir, exist_ok=True)
         url_hash = hashlib.md5(image_url.encode()).hexdigest()
@@ -79,9 +79,9 @@ class ProxyImageView(HomeAssistantView):
                     if resp.status == 200:
                         content = await resp.read()
                         with open(cache_path, "wb") as f: f.write(content)
-                        return web.Response(body=content, content_type=resp.content_type)
+                        return aiohttp.web.Response(body=content, content_type=resp.content_type)
         except Exception as e: _LOGGER.error("Proxy image failed: %s", e)
-        return web.Response(status=404)
+        return aiohttp.web.Response(status=404)
 
 class DiscoverView(HomeAssistantView):
     url = "/api/movie_tracker/discover"
@@ -97,7 +97,7 @@ class DiscoverView(HomeAssistantView):
         try: min_rating = float(request.query.get("rating", 0))
         except: min_rating = 0
         results = await get_discover(self._tmdb_key, media_type, genre, year, min_rating)
-        return web.json_response(results)
+        return aiohttp.web.json_response(results)
 
 class DetailView(HomeAssistantView):
     url = "/api/movie_tracker/detail"
@@ -109,7 +109,7 @@ class DetailView(HomeAssistantView):
     async def get(self, request):
         movie_id = request.query.get("id", "")
         title = request.query.get("title", "")
-        if not movie_id and not title: return web.json_response({"error": "Missing ID or Title"}, status=400)
+        if not movie_id and not title: return aiohttp.web.json_response({"error": "Missing ID or Title"}, status=400)
         try:
             from .api import get_details, get_hellspy_video_url
             details = await get_details(title, tmdb_api_key=self._tmdb_key)
@@ -117,11 +117,11 @@ class DetailView(HomeAssistantView):
                 lang = self._data.get("settings", {}).get("language", "CZ")
                 query_text = details.get("title", title)
                 details["hellspy_url"] = await get_hellspy_video_url(query_text, lang)
-                return web.json_response(details)
-            return web.json_response({"error": "Movie not found"}, status=404)
+                return aiohttp.web.json_response(details)
+            return aiohttp.web.json_response({"error": "Movie not found"}, status=404)
         except Exception as e:
             _LOGGER.error("Error in DetailView: %s", e, exc_info=True)
-            return web.json_response({"error": str(e)}, status=500)
+            return aiohttp.web.json_response({"error": str(e)}, status=500)
 
 # --- HTTP Views ---
 # --- HTTP Views ---
