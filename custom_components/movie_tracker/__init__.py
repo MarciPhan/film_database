@@ -163,7 +163,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             except AttributeError:
                 # Fallback to new HA API (2024.11+)
                 try:
-                    from homeassistant.components.http.static import StaticPathConfig
+                    try:
+                        from homeassistant.components.http.static import StaticPathConfig
+                    except ImportError:
+                        from homeassistant.components.http import StaticPathConfig
+                    
                     await hass.http.async_register_static_paths([
                         StaticPathConfig("/movie_tracker_static", static_path, False)
                     ])
@@ -318,9 +322,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             _LOGGER.error("Failed to register movie tracker panel: %s", exc)
 
     # Register platforms
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
-    )
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
 
     return True
 
