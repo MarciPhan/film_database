@@ -222,20 +222,25 @@ async def get_discover(tmdb_api_key: str, media_type: str = "movie", genre_id: s
                 return results
     return []
 
-async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str) -> list:
+async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str, not_interested: list = None) -> list:
     """Generate recommendations based on history, ratings and wishlist."""
-    # Get seeds
-    top_rated = [m for m in watched_data.values() if int(m.get("user_rating", 0)) >= 4]
+    # 1. Get wishlist items
     wishlist = list(wishlist_data.values())
+    not_interested_set = set(not_interested or [])
+    
+    # Priority seeds: Top rated (4-5), Wishlist items, and Recent
+    top_rated = [m for m in watched_data.values() if int(m.get("user_rating", 0)) >= 4]
     recent = sorted(watched_data.values(), key=lambda x: x.get("watched_at", ""), reverse=True)[:5]
     
+    # Mix them up for variety
     seed_pool = {m["id"]: m for m in top_rated + wishlist + recent}.values()
+    import random
     seeds = random.sample(list(seed_pool), min(len(seed_pool), 5)) if seed_pool else []
 
     recommendations = []
     if tmdb_api_key:
         async with aiohttp.ClientSession() as session:
-            # 1. From seeds
+            # A. From seeds
             for seed in seeds:
                 try:
                     title = seed["title"]
@@ -251,13 +256,15 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                     if r_resp.status == 200:
                                         r_data = await r_resp.json()
                                         for item in r_data.get("results", [])[:3]:
+                                            r_id = f"tmdb_{item['id']}"
+                                            if r_id in not_interested_set: continue
                                             r_title = item.get("title") or item.get("name")
                                             if r_title.lower() in [w["title"].lower() for w in watched_data.values()]: continue
                                             if r_title.lower() in [w["title"].lower() for w in wishlist_data.values()]: continue
                                             poster_path = item.get("poster_path")
                                             poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
                                             recommendations.append({
-                                                "id": f"tmdb_{item['id']}",
+                                                "id": r_id,
                                                 "title": r_title,
                                                 "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
                                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
@@ -267,19 +274,22 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                             })
                 except: continue
 
-            # 2. Trending
+            # B. Trending
             t_url = f"https://api.themoviedb.org/3/trending/all/week?api_key={tmdb_api_key}&language=cs-CZ"
             try:
                 async with session.get(t_url, timeout=3) as resp:
                     if resp.status == 200:
                         t_data = await resp.json()
-                        for item in t_data.get("results", [])[:5]:
+                        for item in t_data.get("results", [])[:10]:
+                            r_id = f"tmdb_{item['id']}"
+                            if r_id in not_interested_set: continue
                             r_title = item.get("title") or item.get("name")
                             if r_title.lower() in [w["title"].lower() for w in watched_data.values()]: continue
+                            if r_title.lower() in [w["title"].lower() for w in wishlist_data.values()]: continue
                             poster_path = item.get("poster_path")
                             poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
                             recommendations.append({
-                                "id": f"tmdb_{item['id']}",
+                                "id": r_id,
                                 "title": r_title,
                                 "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
