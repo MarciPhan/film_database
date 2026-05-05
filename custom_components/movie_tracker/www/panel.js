@@ -525,8 +525,24 @@ class MovieTrackerPanel extends LitElement {
 
       .actions {
         display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: auto;
+      }
+      .actions-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 12px;
-        flex-wrap: wrap;
+      }
+      .rating-box {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
       }
 
       .btn {
@@ -538,6 +554,49 @@ class MovieTrackerPanel extends LitElement {
         border: none;
         display: flex;
         align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 14px;
+        background: rgba(255,255,255,0.05);
+        color: white;
+      }
+      .btn:hover {
+        background: rgba(255,255,255,0.1);
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+      .btn-secondary {
+        background: rgba(255,255,255,0.08);
+        color: white;
+      }
+      
+      .btn-hero {
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        padding: 20px;
+        border-radius: 20px;
+        font-size: 18px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.4);
+        margin-bottom: 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .btn-hero:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 30px -5px rgba(139, 92, 246, 0.6);
+        filter: brightness(1.1);
+      }
         gap: 8px;
       }
 
@@ -857,47 +916,49 @@ class MovieTrackerPanel extends LitElement {
               </div>
             ` : ''}
 
-            <div class="actions" style="margin-top: auto;">
+            <div class="actions">
               <a href="${m.hellspy_url}" target="_blank" class="btn-hero">
                 <ha-icon icon="mdi:play" style="--mdc-icon-size: 28px;"></ha-icon> Sledovat
               </a>
               
-              <div style="grid-column: span 2; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 20px;">
-                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <span style="font-weight: 700; color: var(--text-dim)">Vaše hodnocení</span>
-                  <span style="color:var(--primary); font-weight: 800;">${m.user_rating ? '⭐'.repeat(m.user_rating) : 'Zatím nehodnoceno'}</span>
+              <div class="rating-box">
+                <div style="display:flex; justify-content: space-between; width: 100%; align-items: center;">
+                  <span style="font-weight: 700; color: var(--text-dim); font-size: 13px;">Vaše hodnocení</span>
+                  <span style="color:var(--primary); font-weight: 800; font-size: 13px;">${m.user_rating ? '⭐'.repeat(m.user_rating) : 'Zatím nehodnoceno'}</span>
                 </div>
-                <div style="display:flex; justify-content: center; gap: 12px;">
+                <div style="display:flex; justify-content: center; gap: 8px;">
                   ${[1,2,3,4,5].map(num => html`
                     <ha-icon 
                       icon="${m.user_rating >= num ? 'mdi:star' : 'mdi:star-outline'}"
-                      style="cursor:pointer; color: ${m.user_rating >= num ? 'var(--primary)' : 'var(--text-dim)'}; --mdc-icon-size: 36px; transition: transform 0.2s"
+                      style="cursor:pointer; color: ${m.user_rating >= num ? 'var(--primary)' : 'var(--text-dim)'}; --mdc-icon-size: 32px; transition: transform 0.2s"
                       @click=${() => this._action('rate', m, { rating: num })}
-                      @mouseenter=${e => e.target.style.transform = 'scale(1.2)'}
-                      @mouseleave=${e => e.target.style.transform = 'scale(1)'}
                     ></ha-icon>
                   `)}
                 </div>
               </div>
 
-               ${!isWatched ? html`
-                <button class="btn btn-secondary" style="height: 50px;" @click=${() => this._action('watch', m)}>
-                  <ha-icon icon="mdi:check"></ha-icon> Shlédnuto
-                </button>
-              ` : html`
-                 <button class="btn btn-secondary" style="height: 50px; color:var(--danger)" @click=${() => this._action('delete_watched', m)}>
-                  <ha-icon icon="mdi:delete"></ha-icon> Odebrat
-                </button>
-              `}
+              <div class="actions-row">
+                ${!isWatched ? html`
+                  <button class="btn btn-secondary" @click=${() => this._action('watch', m)}>
+                    <ha-icon icon="mdi:check"></ha-icon> Shlédnuto
+                  </button>
+                ` : html`
+                   <button class="btn btn-secondary" style="color:var(--danger)" @click=${() => this._action('delete_watched', m)}>
+                    <ha-icon icon="mdi:delete"></ha-icon> Odebrat
+                  </button>
+                `}
 
-              ${!isWatched && !isWishlist ? html`
-                <button class="btn btn-secondary" style="height: 50px;" @click=${() => this._action('wishlist', m)}>
-                  <ha-icon icon="mdi:heart-outline"></ha-icon> Wishlist
-                </button>
-              ` : (isWishlist ? html`
-                 <button class="btn btn-secondary" style="height: 50px; color:var(--danger)" @click=${() => this._action('delete_wishlist', m)}>
-                  <ha-icon icon="mdi:delete"></ha-icon> Z wishlistu
-                </button>
+                ${!isWatched && !isWishlist ? html`
+                  <button class="btn btn-secondary" @click=${() => this._action('wishlist', m)}>
+                    <ha-icon icon="mdi:heart-outline"></ha-icon> Wishlist
+                  </button>
+                ` : (isWishlist ? html`
+                   <button class="btn btn-secondary" style="color:var(--danger)" @click=${() => this._action('delete_wishlist', m)}>
+                    <ha-icon icon="mdi:delete"></ha-icon> Z wishlistu
+                  </button>
+                ` : '')}
+              </div>
+            </div>
               ` : '')}
 
               <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
