@@ -374,16 +374,24 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
 
     recommendations = []
     
-    # Priority 1: TMDb Similar
-    if tmdb_api_key and last_favorites:
+    # Diversity logic: combine latest watched and high rated
+    recent = sorted(watched_data.values(), key=lambda x: x.get("watched_at", ""), reverse=True)[:5]
+    top_rated = [m for m in watched_data.values() if int(m.get("user_rating", 0)) >= 4]
+    
+    # Combine and pick random seeds
+    seed_pool = {m["id"]: m for m in recent + top_rated}.values()
+    import random
+    seeds = random.sample(list(seed_pool), min(len(seed_pool), 4)) if seed_pool else []
+
+    recommendations = []
+    if tmdb_api_key and seeds:
         async with aiohttp.ClientSession() as session:
-            for fav in last_favorites:
+            for seed in seeds:
                 try:
-                    title = fav["title"]
-                    is_series = fav.get("type") == "series"
-                    t_type = "tv" if is_series else "movie"
+                    title = seed["title"]
+                    t_type = "tv" if seed.get("type") == "series" else "movie"
                     
-                    # Search to get ID
+                    # Search to get TMDb ID
                     s_url = f"https://api.themoviedb.org/3/search/{t_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(title)}&language=cs-CZ"
                     async with session.get(s_url, timeout=3) as resp:
                         if resp.status == 200:
@@ -391,30 +399,29 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                             if s_data.get("results"):
                                 tmdb_id = s_data["results"][0]["id"]
                                 # Get recommendations
-                                r_url = f"https://api.themoviedb.org/3/{t_type}/{tmdb_id}/recommendations?api_key={tmdb_api_key}&language=cs-CZ"
+                                r_url = f"https://api.themoviedb.org/3/{t_type}/{tmdb_id}/recommendations?api_key={tmdb_key}&language=cs-CZ"
                                 async with session.get(r_url, timeout=3) as r_resp:
                                     if r_resp.status == 200:
                                         r_data = await r_resp.json()
-                                        for item in r_data.get("results", []):
-                                            title = item.get("title") or item.get("name")
-                                            # Check if already watched
-                                            if any(w["title"].lower() == title.lower() for w in watched_data.values()):
+                                        for item in r_data.get("results", [])[:5]:
+                                            r_title = item.get("title") or item.get("name")
+                                            if any(w["title"].lower() == r_title.lower() for w in watched_data.values()):
                                                 continue
                                                 
                                             poster_path = item.get("poster_path")
                                             poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
                                             recommendations.append({
                                                 "id": f"tmdb_{item['id']}",
-                                                "title": title,
+                                                "title": r_title,
                                                 "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
                                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
                                                 "poster": poster,
                                                 "type": "series" if t_type == "tv" else "movie",
                                                 "description": item.get("overview", "")
                                             })
-                                            if len(recommendations) >= 8: break
                 except: continue
-                if len(recommendations) >= 8: break
+    
+    random.shuffle(recommendations)
 
     # Priority 2: Wishlist genre matching (as fallback or addition)
     if len(recommendations) < 6:
