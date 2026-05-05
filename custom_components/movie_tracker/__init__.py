@@ -164,7 +164,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 # Fallback to new HA API (2024.11+)
                 try:
                     from homeassistant.components.http.static import StaticPathConfig
-                    hass.http.async_register_static_paths([
+                    await hass.http.async_register_static_paths([
                         StaticPathConfig("/movie_tracker_static", static_path, False)
                     ])
                 except Exception as static_err:
