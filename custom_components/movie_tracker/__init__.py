@@ -174,6 +174,10 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             except Exception:
                 pass # Already registered
 
+    except Exception as exc:
+        _LOGGER.error("Error setting up Movie Tracker entry: %s", exc, exc_info=True)
+        return False
+
     # --- Services ---
     async def handle_movie_action(call: ServiceCall):
         action = call.data.get("action")
