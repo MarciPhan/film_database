@@ -304,6 +304,47 @@ async def get_hellspy_video_url(title: str, language: str = "CZ") -> str:
     
     return search_url
 
+async def get_discover(tmdb_api_key: str, media_type: str = "movie", genre_id: str = None, year: str = None, min_rating: float = 0) -> list:
+    """Discover movies or TV shows based on filters using TMDb."""
+    if not tmdb_api_key:
+        return []
+        
+    url = f"https://api.themoviedb.org/3/discover/{media_type}?api_key={tmdb_api_key}&language=cs-CZ&sort_by=popularity.desc&include_adult=false"
+    
+    if genre_id:
+        url += f"&with_genres={genre_id}"
+    if year:
+        param = "primary_release_year" if media_type == "movie" else "first_air_date_year"
+        url += f"&{param}={year}"
+    if min_rating:
+        url += f"&vote_average.gte={min_rating}"
+        
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    results = []
+                    for item in data.get("results", []):
+                        title = item.get("title") or item.get("name")
+                        poster_path = item.get("poster_path")
+                        poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
+                        results.append({
+                            "id": f"tmdb_{item['id']}",
+                            "title": title,
+                            "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
+                            "rating": f"{int(item.get('vote_average', 0) * 10)}%",
+                            "poster": poster,
+                            "type": "series" if media_type == "tv" else "movie",
+                            "description": item.get("overview", ""),
+                            "genres": []
+                        })
+                    return results
+    except Exception as e:
+        _LOGGER.error("TMDb discover failed: %s", e)
+        
+    return []
+
 async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str = None) -> list:
     """Recommend movies based on watched history, user ratings, and TMDb."""
     genre_scores = {}
@@ -353,7 +394,8 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                             if any(w["title"].lower() == title.lower() for w in watched_data.values()):
                                                 continue
                                                 
-                                            poster = f"https://image.tmdb.org/t/p/w342{item.get('poster_path')}" if item.get("poster_path") else ""
+                                            poster_path = item.get("poster_path")
+                                            poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
                                             recommendations.append({
                                                 "id": f"tmdb_{item['id']}",
                                                 "title": title,

@@ -90,26 +90,55 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     class ProxyImageView(HomeAssistantView):
         url = "/api/movie_tracker/proxy_image"
         name = "api:movie_tracker:proxy_image"
-        requires_auth = False # Allow browser to fetch images without auth token in URL if needed, but better to keep it for security
+        requires_auth = False
         async def get(self, request):
             import aiohttp
+            import hashlib
             image_url = request.query.get("url")
             if not image_url:
                 return web.Response(status=400)
             
+            # Local caching logic
+            cache_dir = os.path.join(os.path.dirname(__file__), "www", "posters")
+            url_hash = hashlib.md5(image_url.encode()).hexdigest()
+            ext = image_url.split(".")[-1].split("?")[0] if "." in image_url else "jpg"
+            if ext not in ["jpg", "jpeg", "png", "webp"]: ext = "jpg"
+            cache_path = os.path.join(cache_dir, f"{url_hash}.{ext}")
+            
+            # If exists, serve from file
+            if os.path.isfile(cache_path):
+                return web.FileResponse(cache_path)
+
             headers = {
                 "Referer": "https://www.csfd.cz/",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                "User-Agent": "Mozilla/5.0"
             }
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(image_url, headers=headers, timeout=10) as resp:
                         if resp.status == 200:
                             content = await resp.read()
+                            # Save to cache
+                            with open(cache_path, "wb") as f:
+                                f.write(content)
                             return web.Response(body=content, content_type=resp.content_type)
             except Exception as e:
                 _LOGGER.error("Proxy image failed: %s", e)
             return web.Response(status=404)
+
+    class DiscoverView(HomeAssistantView):
+        url = "/api/movie_tracker/discover"
+        name = "api:movie_tracker:discover"
+        requires_auth = True
+        async def get(self, request):
+            from .api import get_discover
+            media_type = request.query.get("type", "movie")
+            genre = request.query.get("genre")
+            year = request.query.get("year")
+            min_rating = float(request.query.get("rating", 0))
+            
+            results = await get_discover(tmdb_key, media_type, genre, year, min_rating)
+            return web.json_response(results)
 
     class DetailView(HomeAssistantView):
         url = "/api/movie_tracker/detail"
@@ -140,6 +169,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     hass.http.register_view(SearchView())
     hass.http.register_view(DetailView())
     hass.http.register_view(ProxyImageView())
+    hass.http.register_view(DiscoverView())
 
     # --- Services ---
 

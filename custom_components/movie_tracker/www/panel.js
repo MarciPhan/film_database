@@ -15,7 +15,10 @@ class MovieTrackerPanel extends LitElement {
       filterGenre: { type: String },
       filterType: { type: String },
       sortBy: { type: String },
-      selectedSeason: { type: Number }
+      selectedSeason: { type: Number },
+      discoverResults: { type: Array },
+      discoverLoading: { type: Boolean },
+      discoverFilters: { type: Object }
     };
   }
 
@@ -33,6 +36,9 @@ class MovieTrackerPanel extends LitElement {
     this.filterType = "";
     this.sortBy = "date";
     this.selectedSeason = 0;
+    this.discoverResults = [];
+    this.discoverLoading = false;
+    this.discoverFilters = { type: 'movie', genre: '', year: '', rating: 0 };
   }
 
   connectedCallback() {
@@ -51,6 +57,23 @@ class MovieTrackerPanel extends LitElement {
       }
     } catch (e) {
       console.error("Failed to fetch movie data", e);
+    }
+  }
+
+  async _fetchDiscover() {
+    this.discoverLoading = true;
+    try {
+      const { type, genre, year, rating } = this.discoverFilters;
+      let url = `/api/movie_tracker/discover?type=${type}&rating=${rating}`;
+      if (genre) url += `&genre=${genre}`;
+      if (year) url += `&year=${year}`;
+      
+      const response = await this.hass.fetchWithAuth(url);
+      this.discoverResults = await response.json();
+    } catch (e) {
+      this._t("Chyba při objevování");
+    } finally {
+      this.discoverLoading = false;
     }
   }
 
@@ -530,6 +553,7 @@ class MovieTrackerPanel extends LitElement {
 
         <div class="tabs">
           <div class="tab ${this.tab === 'dashboard' ? 'active' : ''}" @click=${() => this.tab = 'dashboard'}>Přehled</div>
+          <div class="tab ${this.tab === 'discover' ? 'active' : ''}" @click=${() => { this.tab = 'discover'; if (this.discoverResults.length === 0) this._fetchDiscover(); }}>Objevovat</div>
           <div class="tab ${this.tab === 'library' ? 'active' : ''}" @click=${() => this.tab = 'library'}>Shlédnuto</div>
           <div class="tab ${this.tab === 'wishlist' ? 'active' : ''}" @click=${() => this.tab = 'wishlist'}>Wishlist</div>
         </div>
@@ -554,6 +578,7 @@ class MovieTrackerPanel extends LitElement {
   }
 
   _renderContent(watched, wishlist) {
+    if (this.tab === 'discover') return this._renderDiscover();
     if (this.tab === 'dashboard') {
       return html`
         <section>
@@ -807,6 +832,53 @@ class MovieTrackerPanel extends LitElement {
           </div>
         </div>
       </div>
+    `;
+  }
+  _renderDiscover() {
+    const genres = [
+      {id: 28, name: "Akční"}, {id: 12, name: "Dobrodružný"}, {id: 16, name: "Animovaný"},
+      {id: 35, name: "Komedie"}, {id: 80, name: "Krimi"}, {id: 99, name: "Dokumentární"},
+      {id: 18, name: "Drama"}, {id: 10751, name: "Rodinný"}, {id: 14, name: "Fantasy"},
+      {id: 27, name: "Horor"}, {id: 10749, name: "Romantický"}, {id: 878, name: "Sci-Fi"},
+      {id: 53, name: "Thriller"}
+    ];
+    
+    return html`
+      <section>
+        <div class="toolbar" style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 16px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div class="filter-group" style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <select @change=${e => { this.discoverFilters.type = e.target.value; this._fetchDiscover(); }}>
+              <option value="movie">Filmy</option>
+              <option value="tv">Seriály</option>
+            </select>
+            <select @change=${e => { this.discoverFilters.genre = e.target.value; this._fetchDiscover(); }}>
+              <option value="">Všechny žánry</option>
+              ${genres.map(g => html`<option value="${g.id}">${g.name}</option>`)}
+            </select>
+            <input type="number" placeholder="Rok" style="width: 80px; background: var(--card-bg); color: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 12px;" 
+                   @change=${e => { this.discoverFilters.year = e.target.value; this._fetchDiscover(); }}>
+            <select @change=${e => { this.discoverFilters.rating = e.target.value; this._fetchDiscover(); }}>
+              <option value="0">Jakékoliv hodnocení</option>
+              <option value="5">Nad 50%</option>
+              <option value="7">Nad 70%</option>
+              <option value="8">Nad 80%</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" @click=${this._fetchDiscover} ?disabled=${this.discoverLoading} style="min-width: 100px;">
+             ${this.discoverLoading ? html`<ha-circular-progress active size="small"></ha-circular-progress>` : 'Obnovit'}
+          </button>
+        </div>
+
+        ${this.discoverLoading && this.discoverResults.length === 0 ? html`
+          <div style="display:flex; justify-content:center; padding: 100px;">
+            <ha-circular-progress active></ha-circular-progress>
+          </div>
+        ` : html`
+          <div class="grid">
+            ${this.discoverResults.map(m => this._renderMovieCard(m))}
+          </div>
+        `}
+      </section>
     `;
   }
 }
