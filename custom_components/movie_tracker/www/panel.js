@@ -508,6 +508,15 @@ class MovieTrackerPanel extends LitElement {
         font-weight: 600;
       }
 
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .spin {
+        animation: spin 1s linear infinite;
+        display: inline-block;
+      }
+
       .plot {
         line-height: 1.6;
         color: var(--text-dim);
@@ -631,31 +640,45 @@ class MovieTrackerPanel extends LitElement {
 
   _renderContent(watched, wishlist) {
     if (this.tab === 'discover') return this._renderDiscover();
-    if (this.tab === 'dashboard') {
-      return html`
-        <section>
-          ${this.data.recommendations?.length ? html`
-             <h3 style="margin-bottom: 20px;">✨ Doporučeno pro vás</h3>
-             <div class="grid" style="margin-bottom: 48px;">
-               ${this.data.recommendations.map(m => this._renderMovieCard(m))}
-             </div>
-          ` : ''}
-          
-          <h3 style="margin-bottom: 20px;">🍿 Shlédnuto</h3>
-          ${watched.length === 0 ? html`
-            <div class="empty-state">
-              <ha-icon icon="mdi:movie-open-play"></ha-icon>
-              <p>Zatím jste nic nesledovali. Zkuste něco najít!</p>
-            </div>
-          ` : html`
-            <div class="grid">
-              ${watched.slice(-6).reverse().map(m => this._renderMovieCard(m))}
-            </div>
-          `}
-        </section>
-      `;
-    }
+    if (this.tab === 'dashboard') return this._renderHome();
+    return this._renderList(watched, wishlist);
+  }
 
+  _renderHome() {
+    const watchedList = Object.values(this.data.watched || {});
+    return html`
+      <section>
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="margin:0">✨ Doporučeno pro vás</h3>
+          <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px; display:flex; align-items:center; gap:4px" 
+                  @click=${this._fetch} ?disabled=${this.loadingDetail}>
+            <ha-icon icon="mdi:refresh" class="${this.loadingDetail ? 'spin' : ''}"></ha-icon> Obnovit tipy
+          </button>
+        </div>
+        
+        <div class="grid" style="margin-bottom: 48px;">
+          ${this.data.recommendations?.length ? 
+            this.data.recommendations.map(m => this._renderMovieCard(m)) : 
+            html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`
+          }
+        </div>
+        
+        <h3 style="margin-bottom: 20px;">🍿 Shlédnuto</h3>
+        ${watchedList.length === 0 ? html`
+          <div class="empty-state">
+            <ha-icon icon="mdi:movie-open-play"></ha-icon>
+            <p>Zatím jste nic nesledovali. Zkuste něco najít!</p>
+          </div>
+        ` : html`
+          <div class="grid">
+            ${watchedList.slice(-6).reverse().map(m => this._renderMovieCard(m))}
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  _renderList(watched, wishlist) {
     const list = this.tab === 'library' ? watched : wishlist;
     
     // Filtering and Sorting

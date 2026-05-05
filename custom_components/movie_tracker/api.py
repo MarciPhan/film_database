@@ -291,7 +291,8 @@ class CSFDScraper:
 async def get_hellspy_video_url(title: str, language: str = "CZ") -> str:
     """Search Hellspy and return the first result URL directly."""
     query = title
-    if language == "CZ":
+    # Avoid double 'cz dabing'
+    if language == "CZ" and "cz dabing" not in title.lower():
         query += " cz dabing"
     
     search_url = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
@@ -421,15 +422,64 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                             })
                 except: continue
     
-    random.shuffle(recommendations)
+    # 3. Add some Trending and Random Discover for freshness
+    if tmdb_api_key:
+        async with aiohttp.ClientSession() as session:
+            # Trending
+            t_url = f"https://api.themoviedb.org/3/trending/all/week?api_key={tmdb_api_key}&language=cs-CZ"
+            try:
+                async with session.get(t_url, timeout=3) as resp:
+                    if resp.status == 200:
+                        t_data = await resp.json()
+                        for item in t_data.get("results", [])[:5]:
+                            r_title = item.get("title") or item.get("name")
+                            if any(w["title"].lower() == r_title.lower() for w in watched_data.values()):
+                                continue
+                            poster_path = item.get("poster_path")
+                            poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
+                            recommendations.append({
+                                "id": f"tmdb_{item['id']}",
+                                "title": r_title,
+                                "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
+                                "rating": f"{int(item.get('vote_average', 0) * 10)}%",
+                                "poster": poster,
+                                "type": item.get("media_type", "movie"),
+                                "description": item.get("overview", "")
+                            })
+            except: pass
 
-    # Priority 2: Wishlist genre matching (as fallback or addition)
-    if len(recommendations) < 6:
-        top_genre_names = [g[0] for g in sorted(genre_scores.items(), key=lambda x: x[1], reverse=True)[:3]]
-        for movie in wishlist_data.values():
-            if any(g in top_genre_names for g in movie.get('genres', [])):
-                if not any(r["title"] == movie["title"] for r in recommendations):
-                    recommendations.append(movie)
-            if len(recommendations) >= 10: break
-                
-    return recommendations[:10]
+            # Random Genre Discover
+            random_genre = random.choice([28, 12, 16, 35, 80, 99, 18, 10751, 14, 27, 10749, 878, 53])
+            d_url = f"https://api.themoviedb.org/3/discover/movie?api_key={tmdb_api_key}&with_genres={random_genre}&language=cs-CZ&sort_by=popularity.desc"
+            try:
+                async with session.get(d_url, timeout=3) as resp:
+                    if resp.status == 200:
+                        d_data = await resp.json()
+                        for item in d_data.get("results", [])[:5]:
+                            r_title = item.get("title") or item.get("name")
+                            if any(w["title"].lower() == r_title.lower() for w in watched_data.values()):
+                                continue
+                            poster_path = item.get("poster_path")
+                            poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote('https://image.tmdb.org/t/p/w342' + poster_path)}" if poster_path else ""
+                            recommendations.append({
+                                "id": f"tmdb_{item['id']}",
+                                "title": r_title,
+                                "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
+                                "rating": f"{int(item.get('vote_average', 0) * 10)}%",
+                                "poster": poster,
+                                "type": "movie",
+                                "description": item.get("overview", "")
+                            })
+            except: pass
+
+    # Final shuffle and limit
+    random.shuffle(recommendations)
+    # Deduplicate by ID
+    seen_ids = set()
+    unique_recs = []
+    for r in recommendations:
+        if r["id"] not in seen_ids:
+            unique_recs.append(r)
+            seen_ids.add(r["id"])
+            
+    return unique_recs[:15]
