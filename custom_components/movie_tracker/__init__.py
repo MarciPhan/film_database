@@ -203,7 +203,23 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             if movie_id not in data["watched"]:
                 data["watched"][movie_id] = target
                 data["wishlist"].pop(movie_id, None)
-        
+
+        elif action == "watch_season":
+            season_num = call.data.get("season_num")
+            episodes = call.data.get("episodes", []) # List of episode IDs in this season
+            target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id) or call.data.get("movie")
+            if not target: return
+            
+            if "watched_episodes" not in target: target["watched_episodes"] = {}
+            for ep_id in episodes:
+                target["watched_episodes"][ep_id] = target["watched_episodes"].get(ep_id, {})
+                target["watched_episodes"][ep_id]["watched"] = True
+            
+            # Also store season rating if provided
+            if movie_id not in data["watched"]:
+                data["watched"][movie_id] = target
+                data["wishlist"].pop(movie_id, None)
+
         elif action == "rate":
             rating = call.data.get("rating")
             if movie_id in data["watched"]:

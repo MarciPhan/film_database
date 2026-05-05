@@ -691,6 +691,18 @@ class MovieTrackerPanel extends LitElement {
                   `)}
                 </div>
                 
+                <div style="display:flex; justify-content: flex-end; margin-bottom: 16px;">
+                  <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 12px;" @click=${() => {
+                    const s = m.seasons[this.selectedSeason];
+                    this._action('watch_season', m, { 
+                      season_num: this.selectedSeason + 1, 
+                      episodes: s.episodes.map(e => e.id) 
+                    });
+                  }}>
+                    <ha-icon icon="mdi:check-all" style="--mdc-icon-size: 16px; margin-right: 4px;"></ha-icon> Označit celou řadu jako shlédnutou
+                  </button>
+                </div>
+                
                 <div class="episodes-list" style="display: flex; flex-direction: column; gap: 8px;">
                   ${m.seasons[this.selectedSeason || 0]?.episodes.map(ep => {
                     const epData = (this.data.watched[m.id] || this.data.wishlist[m.id])?.watched_episodes?.[ep.id] || {};
