@@ -265,6 +265,17 @@ class CSFDScraper:
                                 })
                         except: pass
 
+                    # Smarter hellspy_url for series: go to S01E01 by default
+                    if is_series and details.get("seasons"):
+                        first_s = details["seasons"][0]
+                        if first_s.get("episodes"):
+                            ep1 = first_s["episodes"][0]
+                            # Try to get direct link for S01E01
+                            s_num = first_s.get("number") or 1
+                            ep_num = ep1.get("number") or 1
+                            q = f"{details['title']} S{str(s_num).zfill(2)}E{str(ep_num).zfill(2)} cz dabing"
+                            details["hellspy_url"] = await get_hellspy_video_url(q, "CZ")
+
                     return details
         except Exception as e:
             _LOGGER.error("CZDB detail fetch failed: %s", e)
@@ -310,7 +321,7 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
         for genre in movie.get('genres', []):
             genre_scores[genre] = genre_scores.get(genre, 0) + user_rating
         
-        if len(last_favorites) < 3 and movie.get("user_rating", 0) >= 4:
+        if len(last_favorites) < 3 and int(movie.get("user_rating", 0)) >= 4:
             last_favorites.append(movie)
 
     recommendations = []

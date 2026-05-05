@@ -86,6 +86,9 @@ class MovieTrackerPanel extends LitElement {
   async _viewDetail(movie) {
     this.loadingDetail = true;
     this.selectedSeason = 0;
+    // Set initial data from search results to avoid blank screen/missing poster
+    this.selectedMovie = { ...movie };
+    
     try {
       const id = movie.id || movie.csfd_id || "";
       const title = movie.title || "";
@@ -93,7 +96,8 @@ class MovieTrackerPanel extends LitElement {
       if (r.ok) {
         const details = await r.json();
         const localData = this.data.watched[id] || this.data.wishlist[id] || {};
-        this.selectedMovie = { ...details, ...localData };
+        // Merge order: Search Result < API Details < Local Saved Data
+        this.selectedMovie = { ...movie, ...details, ...localData };
       } else {
         this._t("Nepodařilo se načíst detaily");
       }
@@ -664,7 +668,9 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <div class="modal-overlay" @click=${() => this.selectedMovie = null}>
         <div class="modal-content" @click=${e => e.stopPropagation()}>
-          <img class="modal-poster" src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}">
+          <img class="modal-poster" 
+               src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}"
+               @error=${e => e.target.src = 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Plakát+nenalezen'}>
           <div class="modal-details">
             <div style="display:flex; justify-content: space-between; align-items: flex-start;">
               <h2>${m.title}</h2>
