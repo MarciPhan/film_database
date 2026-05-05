@@ -11,7 +11,6 @@ from datetime import datetime
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
 from homeassistant.components.http import HomeAssistantView, StaticPathConfig
-from homeassistant.components import frontend
 import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION, EVENT_MOVIES_UPDATED
@@ -294,7 +293,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     # --- Register Panel ---
     if "movie-tracker" not in hass.data.get("frontend_panels", {}):
         try:
-            frontend.async_register_panel(
+            from homeassistant.components.frontend import async_register_built_in_panel
+            async_register_built_in_panel(
                 hass,
                 component_name="custom",
                 sidebar_title="Filmotéka",
