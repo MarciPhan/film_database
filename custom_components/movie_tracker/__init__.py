@@ -87,6 +87,30 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
     tmdb_key = entry.data.get("tmdb_api_key", "")
     
+    class ProxyImageView(HomeAssistantView):
+        url = "/api/movie_tracker/proxy_image"
+        name = "api:movie_tracker:proxy_image"
+        requires_auth = False # Allow browser to fetch images without auth token in URL if needed, but better to keep it for security
+        async def get(self, request):
+            import aiohttp
+            image_url = request.query.get("url")
+            if not image_url:
+                return web.Response(status=400)
+            
+            headers = {
+                "Referer": "https://www.csfd.cz/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(image_url, headers=headers, timeout=10) as resp:
+                        if resp.status == 200:
+                            content = await resp.read()
+                            return web.Response(body=content, content_type=resp.content_type)
+            except Exception as e:
+                _LOGGER.error("Proxy image failed: %s", e)
+            return web.Response(status=404)
+
     class DetailView(HomeAssistantView):
         url = "/api/movie_tracker/detail"
         name = "api:movie_tracker:detail"
@@ -114,6 +138,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     hass.http.register_view(DataView())
     hass.http.register_view(SearchView())
     hass.http.register_view(DetailView())
+    hass.http.register_view(ProxyImageView())
 
     # --- Services ---
 

@@ -14,7 +14,8 @@ class MovieTrackerPanel extends LitElement {
       toast: { type: String },
       filterGenre: { type: String },
       filterType: { type: String },
-      sortBy: { type: String }
+      sortBy: { type: String },
+      selectedSeason: { type: Number }
     };
   }
 
@@ -31,6 +32,7 @@ class MovieTrackerPanel extends LitElement {
     this.filterGenre = "";
     this.filterType = "";
     this.sortBy = "date";
+    this.selectedSeason = 0;
   }
 
   connectedCallback() {
@@ -83,6 +85,7 @@ class MovieTrackerPanel extends LitElement {
 
   async _viewDetail(movie) {
     this.loadingDetail = true;
+    this.selectedSeason = 0;
     try {
       const id = movie.id || movie.csfd_id || "";
       const title = movie.title || "";
@@ -674,6 +677,35 @@ class MovieTrackerPanel extends LitElement {
             </div>
 
             <p class="plot">${m.description || 'K tomuto titulu zatím není k dispozici žádný popis.'}</p>
+
+            ${m.seasons?.length ? html`
+              <div class="seasons-container" style="margin-top: 32px; border-top: 1px solid var(--border-color); padding-top: 24px;">
+                <h3 style="margin-bottom: 16px;">Sezóny a epizody</h3>
+                <div style="display:flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 16px;">
+                  ${m.seasons.map((s, idx) => html`
+                    <button 
+                      class="btn ${this.selectedSeason === idx ? 'btn-primary' : 'btn-secondary'}"
+                      style="white-space: nowrap; padding: 6px 16px; font-size: 13px;"
+                      @click=${() => { this.selectedSeason = idx; this.requestUpdate(); }}
+                    >${s.name}</button>
+                  `)}
+                </div>
+                
+                <div class="episodes-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  ${m.seasons[this.selectedSeason || 0]?.episodes.map(ep => html`
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                      <div style="flex: 1">
+                        <div style="font-weight: 700; font-size: 14px;">${ep.number ? `${ep.number}. ` : ''}${ep.title}</div>
+                        ${ep.overview ? html`<div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${ep.overview}</div>` : ''}
+                      </div>
+                      <a href="${ep.url}" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                        <ha-icon icon="mdi:play" style="--mdc-icon-size: 18px;"></ha-icon> Přehrát
+                      </a>
+                    </div>
+                  `)}
+                </div>
+              </div>
+            ` : ''}
 
             <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px;">
               <a href="${m.hellspy_url}" target="_blank" class="btn btn-primary" style="text-decoration:none; grid-column: span 2; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 18px;">

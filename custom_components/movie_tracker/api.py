@@ -95,23 +95,33 @@ class CSFDScraper:
                         )
                         
                         poster = item.get("obrazek_url") or item.get("imgo") or ""
+                        orig_title = item.get("original", "")
                         
                         # Enhancement: Fetch better poster from TMDb if key is available
                         if tmdb_api_key:
                             try:
                                 t_type = "tv" if is_series else "movie"
-                                t_url = f"https://api.themoviedb.org/3/search/{t_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(title)}&language=cs-CZ"
-                                async with session.get(t_url, timeout=2) as t_resp:
-                                    if t_resp.status == 200:
-                                        t_data = await t_resp.json()
-                                        if t_data.get("results") and t_data["results"][0].get("poster_path"):
-                                            poster = f"https://image.tmdb.org/t/p/w342{t_data['results'][0]['poster_path']}"
+                                # Try search with original title first for better match, then Czech
+                                for q_title in [orig_title, title]:
+                                    if not q_title: continue
+                                    t_url = f"https://api.themoviedb.org/3/search/{t_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(q_title)}&language=cs-CZ"
+                                    async with session.get(t_url, timeout=2) as t_resp:
+                                        if t_resp.status == 200:
+                                            t_data = await t_resp.json()
+                                            if t_data.get("results") and t_data["results"][0].get("poster_path"):
+                                                poster = f"https://image.tmdb.org/t/p/w342{t_data['results'][0]['poster_path']}"
+                                                break
                             except: pass
+
+                        # If poster is still from CZDB, use proxy
+                        if poster and "pmgstatic.com" in poster:
+                            poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote(poster)}"
 
                         results.append({
                             "id": str(item.get("id")),
                             "csfd_id": str(item.get("csfd_id")),
                             "title": title,
+                            "original_title": orig_title,
                             "year": str(item.get("rok", "N/A")),
                             "url": item.get("csfd_url"),
                             "poster": poster,
@@ -155,60 +165,78 @@ class CSFDScraper:
                         item.get("cas") == "N/A"
                     )
                     
+                    poster = item.get("obrazek_url") or item.get("imgo") or ""
+                    if poster and "pmgstatic.com" in poster:
+                        poster = f"/api/movie_tracker/proxy_image?url={urllib.parse.quote(poster)}"
+
                     details = {
                         "id": str(item.get("id")),
+                        "csfd_id": str(item.get("csfd_id")),
                         "title": title,
+                        "original_title": item.get("original", ""),
                         "year": str(item.get("rok", "N/A")),
-                        "rating": item.get("hodnoceni", "0%"),
-                        "poster": item.get("obrazek_url"),
+                        "rating": item.get("hodnoceni", "N/A"),
                         "genres": [g.strip() for g in item.get("zanr", "").split(",")] if item.get("zanr") else [],
-                        "origin": f"{item.get('zeme', 'Neznámý původ')} ({item.get('rok', '')})",
-                        "description": plot,
+                        "description": item.get("plot", ""),
+                        "poster": poster,
+                        "origin": f"{item.get('zeme', 'N/A')} ({item.get('rok', 'N/A')})",
                         "url": item.get("csfd_url"),
                         "type": "series" if is_series else "movie",
-                        "episodes": []
+                        "seasons": []
                     }
 
-                    # --- EPISODES FETCHING ---
-                    if is_series:
-                        # Priority 1: TMDb (if key provided)
-                        if tmdb_api_key:
-                            try:
-                                _LOGGER.debug("Fetching episodes from TMDb for: %s", title)
-                                tmdb_search = f"https://api.themoviedb.org/3/search/tv?api_key={tmdb_api_key}&query={urllib.parse.quote(title)}&language=cs-CZ"
-                                async with session.get(tmdb_search, timeout=5) as tmdb_resp:
-                                    if tmdb_resp.status == 200:
-                                        tmdb_data = await tmdb_resp.json()
-                                        if tmdb_data.get("results"):
-                                            tmdb_item = tmdb_data["results"][0]
-                                            tmdb_id = tmdb_item["id"]
-                                            if tmdb_item.get("poster_path"):
-                                                details["poster"] = f"https://image.tmdb.org/t/p/w600_and_h900_bestv2{tmdb_item['poster_path']}"
-                                            
-                                            details_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={tmdb_api_key}&language=cs-CZ"
-                                            async with session.get(details_url, timeout=5) as det_resp:
-                                                if det_resp.status == 200:
-                                                    full_data = await det_resp.json()
-                                                    for season in full_data.get("seasons", []):
-                                                        s_num = season.get("season_number")
-                                                        if s_num == 0: continue
-                                                        
-                                                        s_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{s_num}?api_key={tmdb_api_key}&language=cs-CZ"
-                                                        async with session.get(s_url, timeout=5) as s_resp:
-                                                            if s_resp.status == 200:
-                                                                s_data = await s_resp.json()
-                                                                for ep in s_data.get("episodes", []):
-                                                                    details["episodes"].append({
-                                                                        "title": f"S{s_num}E{ep.get('episode_number')} - {ep.get('name')}",
-                                                                        "url": f"https://www.themoviedb.org/tv/{tmdb_id}/season/{s_num}/episode/{ep.get('episode_number')}"
-                                                                    })
-                            except Exception as e:
-                                _LOGGER.warning("TMDb enhancement failed: %s", e)
+                    # Priority 1: TMDb for rich series data
+                    if is_series and tmdb_api_key:
+                        try:
+                            # Search for the TV show
+                            s_url = f"https://api.themoviedb.org/3/search/tv?api_key={tmdb_api_key}&query={urllib.parse.quote(details['original_title'] or title)}&language=cs-CZ"
+                            async with session.get(s_url, timeout=5) as s_resp:
+                                if s_resp.status == 200:
+                                    s_data = await s_resp.json()
+                                    if s_data.get("results"):
+                                        tmdb_id = s_data["results"][0]["id"]
+                                        # Get full details including seasons
+                                        d_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={tmdb_api_key}&language=cs-CZ"
+                                        async with session.get(d_url, timeout=5) as d_resp:
+                                            if d_resp.status == 200:
+                                                d_data = await d_resp.json()
+                                                if d_data.get("poster_path"):
+                                                    details["poster"] = f"https://image.tmdb.org/t/p/w780{d_data['poster_path']}"
+                                                
+                                                for season in d_data.get("seasons", []):
+                                                    s_num = season.get("season_number")
+                                                    if s_num == 0: continue # Skip specials
+                                                    
+                                                    # Get episodes for this season
+                                                    e_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{s_num}?api_key={tmdb_api_key}&language=cs-CZ"
+                                                    async with session.get(e_url, timeout=5) as e_resp:
+                                                        if e_resp.status == 200:
+                                                            e_data = await e_resp.json()
+                                                            season_info = {
+                                                                "name": season.get("name") or f"{s_num}. řada",
+                                                                "episodes": []
+                                                            }
+                                                            for ep in e_data.get("episodes", []):
+                                                                season_info["episodes"].append({
+                                                                    "title": ep.get("name"),
+                                                                    "number": ep.get("episode_number"),
+                                                                    "overview": ep.get("overview"),
+                                                                    "url": f"https://www.themoviedb.org/tv/{tmdb_id}/season/{s_num}/episode/{ep.get('episode_number')}"
+                                                                })
+                                                            details["seasons"].append(season_info)
+                        except Exception as e:
+                            _LOGGER.error("TMDb series fetch failed: %s", e)
 
-                        # Priority 2: SerialZone (if TMDb failed or no key)
-                        if not details["episodes"]:
-                            _LOGGER.debug("Fetching episodes from SerialZone for: %s", title)
-                            details["episodes"] = await SerialZoneScraper.get_episodes(title)
+                    # Priority 2: SerialZone Fallback (simplified)
+                    if is_series and not details["seasons"]:
+                        try:
+                            ep_list = await SerialZoneScraper.get_episodes(title)
+                            if ep_list:
+                                details["seasons"].append({
+                                    "name": "Všechny epizody",
+                                    "episodes": [{"title": e["title"], "url": e["url"]} for e in ep_list]
+                                })
+                        except: pass
 
                     return details
         except Exception as e:
