@@ -184,12 +184,24 @@ class MovieTrackerPanel extends LitElement {
       }
 
       .episode-item {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transition: all 0.3s ease;
+      }
+      .episode-item.watched {
+        background: rgba(139, 92, 246, 0.08);
+        border-color: var(--primary);
+      }
+      .episode-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        padding: 24px;
-        border-bottom: 1px solid var(--border-color);
-        transition: background 0.2s;
+        align-items: flex-start;
         gap: 12px;
       }
 
@@ -779,8 +791,8 @@ class MovieTrackerPanel extends LitElement {
                     const epRating = epData.rating || 0;
                     
                     return html`
-                    <div style="background: ${isEpWatched ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isEpWatched ? 'var(--primary)' : 'var(--border-color)'}; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 12px; transition: 0.3s">
-                      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                    <div class="episode-item ${isEpWatched ? 'watched' : ''}">
+                      <div class="episode-header">
                         <div style="flex: 1">
                           <div style="font-weight: 700; font-size: 14px; display:flex; align-items:center; gap:8px">
                             ${isEpWatched ? html`<ha-icon icon="mdi:check-circle" style="color:var(--primary); --mdc-icon-size: 18px;"></ha-icon>` : ''}
@@ -790,7 +802,7 @@ class MovieTrackerPanel extends LitElement {
                         </div>
                         <div style="display:flex; gap:8px">
                            <a href="${ep.url}" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">
-                            <ha-icon icon="mdi:play" style="--mdc-icon-size: 18px;"></ha-icon> Hellspy
+                            <ha-icon icon="mdi:play" style="--mdc-icon-size: 18px;"></ha-icon>
                           </a>
                            <button class="btn ${isEpWatched ? 'btn-primary' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 12px;" @click=${() => this._action('watch_episode', m, { episode_id: ep.id })}>
                             <ha-icon icon="${isEpWatched ? 'mdi:eye-off' : 'mdi:eye'}" style="--mdc-icon-size: 18px;"></ha-icon>
@@ -799,12 +811,12 @@ class MovieTrackerPanel extends LitElement {
                       </div>
                       
                       <div style="display:flex; align-items:center; gap:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05)">
-                        <span style="font-size: 11px; font-weight:700; color:var(--text-dim)">HODNOCENÍ DÍLU:</span>
-                        <div style="display:flex; gap:4px">
+                        <span style="font-size: 10px; font-weight:700; color:var(--text-dim)">HODNOCENÍ DÍLU:</span>
+                        <div style="display:flex; gap:2px">
                           ${[1,2,3,4,5].map(star => html`
                             <ha-icon 
                               icon="${epRating >= star ? 'mdi:star' : 'mdi:star-outline'}" 
-                              style="cursor:pointer; color: ${epRating >= star ? 'var(--primary)' : 'var(--text-dim)'}; --mdc-icon-size: 20px;"
+                              style="cursor:pointer; color: ${epRating >= star ? 'var(--primary)' : 'var(--text-dim)'}; --mdc-icon-size: 18px;"
                               @click=${() => this._action('rate_episode', m, { episode_id: ep.id, rating: star })}
                             ></ha-icon>
                           `)}

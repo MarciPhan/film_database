@@ -178,6 +178,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     hass.http.register_view(ProxyImageView())
     hass.http.register_view(DiscoverView())
 
+    # Register platforms
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+    )
+
     # --- Services ---
 
     async def handle_movie_action(call: ServiceCall):
@@ -278,6 +283,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             data["settings"].update(call.data.get("settings", {}))
         
         await _save()
+        hass.bus.async_fire(EVENT_MOVIES_UPDATED)
 
     hass.services.async_register(DOMAIN, "movie_action", handle_movie_action)
 
