@@ -39,6 +39,7 @@ class MovieTrackerPanel extends LitElement {
     this.discoverResults = [];
     this.discoverLoading = false;
     this.discoverFilters = { type: 'movie', genre: '', year: '', rating: 0 };
+    this._dismissedIds = new Set();
   }
 
   connectedCallback() {
@@ -110,7 +111,7 @@ class MovieTrackerPanel extends LitElement {
     this.loadingDetail = true;
     this.selectedSeason = 0;
     // Set initial data from search results to avoid blank screen/missing poster
-    this.selectedMovie = { ...movie };
+    this.selectedMovie = Object.assign({}, movie);
     
     try {
       const id = movie.id || movie.csfd_id || "";
@@ -120,7 +121,7 @@ class MovieTrackerPanel extends LitElement {
         const details = await r.json();
         const localData = this.data.watched[id] || this.data.wishlist[id] || {};
         // Merge order: Search Result < API Details < Local Saved Data
-        this.selectedMovie = { ...movie, ...details, ...localData };
+        this.selectedMovie = Object.assign({}, movie, details, localData);
       } else {
         this._t("Nepodařilo se načíst detaily");
       }
@@ -133,7 +134,12 @@ class MovieTrackerPanel extends LitElement {
 
   async _action(action, movie, extra = {}) {
     try {
-      await this._svc("movie_action", { action, movie, ...extra });
+      if (action === 'not_interested') {
+        this._dismissedIds.add(movie.id);
+        this.requestUpdate();
+      }
+
+      await this._svc("movie_action", Object.assign({ action: action, movie: movie }, extra));
       
       const messages = {
         'watch': "Přidáno do shlédnutých",
@@ -385,6 +391,33 @@ class MovieTrackerPanel extends LitElement {
         border: 1px solid rgba(255,255,255,0.1);
       }
 
+      .btn-dismiss {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        z-index: 10;
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(4px);
+        opacity: 0;
+      }
+      .movie-card:hover .btn-dismiss {
+        opacity: 1;
+      }
+      .btn-dismiss:hover {
+        background: var(--danger);
+        transform: scale(1.1);
+      }
+
       .rating-high { color: #4ade80; }
       .rating-mid { color: #facc15; }
       .rating-low { color: #f87171; }
@@ -469,21 +502,6 @@ class MovieTrackerPanel extends LitElement {
         background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%);
         height: 100%;
         box-sizing: border-box;
-      }
-
-      /* Custom scrollbar for premium look */
-      .modal-details::-webkit-scrollbar {
-        width: 6px;
-      }
-      .modal-details::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .modal-details::-webkit-scrollbar-thumb {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-      }
-      .modal-details::-webkit-scrollbar-thumb:hover {
-        background: rgba(255,255,255,0.2);
       }
 
       .modal-details h2 {
@@ -596,8 +614,6 @@ class MovieTrackerPanel extends LitElement {
         transform: translateY(-2px);
         box-shadow: 0 15px 30px -5px rgba(139, 92, 246, 0.6);
         filter: brightness(1.1);
-      }
-        gap: 8px;
       }
 
       .btn-primary { background: var(--primary); color: white; }
@@ -716,10 +732,14 @@ class MovieTrackerPanel extends LitElement {
         </div>
         
         <div class="grid" style="margin-bottom: 48px;">
-          ${this.data.recommendations?.length ? 
-            this.data.recommendations.map(m => this._renderMovieCard(m)) : 
-            html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`
-          }
+          ${(() => {
+            const serverDismissed = Object.keys(this.data.not_interested || {});
+            const filtered = (this.data.recommendations || []).filter(m => 
+              !this._dismissedIds.has(m.id) && !serverDismissed.includes(m.id)
+            );
+            if (!filtered.length) return html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`;
+            return filtered.map(m => this._renderMovieCard(m, true));
+          })()}
         </div>
         
         <h3 style="margin-bottom: 20px;">🍿 Shlédnuto</h3>
@@ -741,7 +761,7 @@ class MovieTrackerPanel extends LitElement {
     const list = this.tab === 'library' ? watched : wishlist;
     
     // Filtering and Sorting
-    let filtered = [...list];
+    let filtered = list.slice();
     if (this.filterGenre) {
       filtered = filtered.filter(m => m.genres?.includes(this.filterGenre));
     }
@@ -759,7 +779,13 @@ class MovieTrackerPanel extends LitElement {
       return dateB.localeCompare(dateA);
     });
 
-    const allGenres = [...new Set(list.flatMap(m => m.genres || []))].sort();
+    let allGenresSet = new Set();
+    watched.concat(wishlist).forEach(function(m) {
+      if (m.genres) {
+        m.genres.forEach(function(g) { allGenresSet.add(g); });
+      }
+    });
+    const allGenres = Array.from(allGenresSet).sort();
 
     return html`
       <section>
@@ -800,7 +826,7 @@ class MovieTrackerPanel extends LitElement {
     `;
   }
 
-  _renderMovieCard(m) {
+  _renderMovieCard(m, isRecommendation = false) {
     const ratingVal = parseInt(m.rating) || 0;
     const ratingClass = ratingVal >= 75 ? 'rating-high' : (ratingVal >= 50 ? 'rating-mid' : 'rating-low');
     
@@ -809,6 +835,11 @@ class MovieTrackerPanel extends LitElement {
         <div class="poster-wrapper">
           <img src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}" loading="lazy">
           ${m.rating ? html`<div class="rating-badge ${ratingClass}">${m.rating}</div>` : ''}
+          ${isRecommendation ? html`
+            <div class="btn-dismiss" title="Nezajímá mě" @click=${(e) => { e.stopPropagation(); this._action('not_interested', m); }}>
+              <ha-icon icon="mdi:close" style="--mdc-icon-size: 18px;"></ha-icon>
+            </div>
+          ` : ''}
           ${m.user_rating ? html`<div class="rating-badge" style="top: auto; bottom: 8px; background: var(--primary); font-size: 10px;">${'⭐'.repeat(m.user_rating)}</div>` : ''}
         </div>
         <div class="movie-info">
@@ -959,12 +990,10 @@ class MovieTrackerPanel extends LitElement {
                 ` : '')}
               </div>
             </div>
-              ` : '')}
 
-              <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
-                <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
-              </a>
-            </div>
+            <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
+              <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
+            </a>
           </div>
         </div>
       </div>
