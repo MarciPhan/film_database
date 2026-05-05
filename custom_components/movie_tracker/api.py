@@ -238,27 +238,76 @@ async def get_hellspy_video_url(title: str, language: str = "CZ") -> str:
     
     return search_url
 
-def get_recommendations(watched_data: dict, wishlist_data: dict) -> list:
-    """Recommend movies from wishlist based on watched genres."""
+async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str = None) -> list:
+    """Recommend movies based on watched history, user ratings, and TMDb."""
     genre_scores = {}
-    for movie in watched_data.values():
-        for genre in movie.get('genres', []):
-            genre_scores[genre] = genre_scores.get(genre, 0) + 1
-            
-    if not genre_scores:
-        return []
-        
-    top_genres = sorted(genre_scores.items(), key=lambda x: x[1], reverse=True)[:3]
-    top_genre_names = [g[0] for g in top_genres]
+    last_favorites = []
     
+    # Sort by rating and date to find top favorites
+    sorted_watched = sorted(
+        watched_data.values(), 
+        key=lambda x: (int(x.get("user_rating", 0)), x.get("watched_at", "")), 
+        reverse=True
+    )
+    
+    for movie in sorted_watched:
+        user_rating = int(movie.get("user_rating", 3)) # Default weight 3
+        for genre in movie.get('genres', []):
+            genre_scores[genre] = genre_scores.get(genre, 0) + user_rating
+        
+        if len(last_favorites) < 3 and movie.get("user_rating", 0) >= 4:
+            last_favorites.append(movie)
+
     recommendations = []
-    # Find movies in wishlist that match top genres
-    for movie in wishlist_data.values():
-        movie_genres = movie.get('genres', [])
-        # If any of the movie's genres match our top genres
-        if any(g in top_genre_names for g in movie_genres):
-            recommendations.append(movie)
-            if len(recommendations) >= 6:
-                break
+    
+    # Priority 1: TMDb Similar
+    if tmdb_api_key and last_favorites:
+        async with aiohttp.ClientSession() as session:
+            for fav in last_favorites:
+                try:
+                    title = fav["title"]
+                    is_series = fav.get("type") == "series"
+                    t_type = "tv" if is_series else "movie"
+                    
+                    # Search to get ID
+                    s_url = f"https://api.themoviedb.org/3/search/{t_type}?api_key={tmdb_api_key}&query={urllib.parse.quote(title)}&language=cs-CZ"
+                    async with session.get(s_url, timeout=3) as resp:
+                        if resp.status == 200:
+                            s_data = await resp.json()
+                            if s_data.get("results"):
+                                tmdb_id = s_data["results"][0]["id"]
+                                # Get recommendations
+                                r_url = f"https://api.themoviedb.org/3/{t_type}/{tmdb_id}/recommendations?api_key={tmdb_api_key}&language=cs-CZ"
+                                async with session.get(r_url, timeout=3) as r_resp:
+                                    if r_resp.status == 200:
+                                        r_data = await r_resp.json()
+                                        for item in r_data.get("results", []):
+                                            title = item.get("title") or item.get("name")
+                                            # Check if already watched
+                                            if any(w["title"].lower() == title.lower() for w in watched_data.values()):
+                                                continue
+                                                
+                                            poster = f"https://image.tmdb.org/t/p/w342{item.get('poster_path')}" if item.get("poster_path") else ""
+                                            recommendations.append({
+                                                "id": f"tmdb_{item['id']}",
+                                                "title": title,
+                                                "year": (item.get("release_date") or item.get("first_air_date") or "N/A")[:4],
+                                                "rating": f"{int(item.get('vote_average', 0) * 10)}%",
+                                                "poster": poster,
+                                                "type": "series" if t_type == "tv" else "movie",
+                                                "description": item.get("overview", "")
+                                            })
+                                            if len(recommendations) >= 8: break
+                except: continue
+                if len(recommendations) >= 8: break
+
+    # Priority 2: Wishlist genre matching (as fallback or addition)
+    if len(recommendations) < 6:
+        top_genre_names = [g[0] for g in sorted(genre_scores.items(), key=lambda x: x[1], reverse=True)[:3]]
+        for movie in wishlist_data.values():
+            if any(g in top_genre_names for g in movie.get('genres', [])):
+                if not any(r["title"] == movie["title"] for r in recommendations):
+                    recommendations.append(movie)
+            if len(recommendations) >= 10: break
                 
-    return recommendations
+    return recommendations[:10]

@@ -62,9 +62,16 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             from aiohttp import web
             # Add Hellspy links and recommendations dynamically if needed, 
             # or just serve raw data
-            res = dict(data)
-            res["recommendations"] = get_recommendations(data["watched"], data["wishlist"])
-            return web.json_response(res)
+            # Get recommendations based on watched history
+            tmdb_key = entry.data.get("tmdb_api_key", "")
+            recommendations = await get_recommendations(data["watched"], data["wishlist"], tmdb_api_key=tmdb_key)
+            
+            return web.json_response({
+                "watched": data["watched"],
+                "wishlist": data["wishlist"],
+                "settings": data["settings"],
+                "recommendations": recommendations
+            })
 
     class SearchView(HomeAssistantView):
         url = "/api/movie_tracker/search"
@@ -152,6 +159,13 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             target.setdefault("watched_episodes", [])
             if ep_url not in target["watched_episodes"]:
                 target["watched_episodes"].append(ep_url)
+        
+        elif action == "rate":
+            rating = call.data.get("rating")
+            if movie_id in data["watched"]:
+                data["watched"][movie_id]["user_rating"] = rating
+            elif movie_id in data["wishlist"]:
+                 data["wishlist"][movie_id]["user_rating"] = rating
         
         elif action == "update_settings":
             data["settings"].update(call.data.get("settings", {}))

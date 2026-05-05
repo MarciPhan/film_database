@@ -13,6 +13,7 @@ class MovieTrackerPanel extends LitElement {
       loadingDetail: { type: Boolean },
       toast: { type: String },
       filterGenre: { type: String },
+      filterType: { type: String },
       sortBy: { type: String }
     };
   }
@@ -28,7 +29,8 @@ class MovieTrackerPanel extends LitElement {
     this.loadingDetail = false;
     this.toast = "";
     this.filterGenre = "";
-    this.sortBy = "newest";
+    this.filterType = "";
+    this.sortBy = "date";
   }
 
   connectedCallback() {
@@ -243,6 +245,38 @@ class MovieTrackerPanel extends LitElement {
         background: var(--card-bg);
         color: white;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      }
+
+      /* Toolbar */
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .filter-group {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      select {
+        background: var(--card-bg);
+        color: white;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-family: inherit;
+        outline: none;
+        cursor: pointer;
+        transition: border 0.2s;
+      }
+
+      select:focus {
+        border-color: var(--primary);
       }
 
       /* Grid */
@@ -536,16 +570,60 @@ class MovieTrackerPanel extends LitElement {
 
     const list = this.tab === 'library' ? watched : wishlist;
     
+    // Filtering and Sorting
+    let filtered = [...list];
+    if (this.filterGenre) {
+      filtered = filtered.filter(m => m.genres?.includes(this.filterGenre));
+    }
+    if (this.filterType) {
+      filtered = filtered.filter(m => m.type === this.filterType);
+    }
+
+    const sorted = filtered.sort((a, b) => {
+      if (this.sortBy === 'rating') return (parseInt(b.rating) || 0) - (parseInt(a.rating) || 0);
+      if (this.sortBy === 'user_rating') return (b.user_rating || 0) - (a.user_rating || 0);
+      if (this.sortBy === 'year') return (parseInt(b.year) || 0) - (parseInt(a.year) || 0);
+      // Default: date (newest first)
+      const dateA = a.watched_at || a.added_at || '';
+      const dateB = b.watched_at || b.added_at || '';
+      return dateB.localeCompare(dateA);
+    });
+
+    const allGenres = [...new Set(list.flatMap(m => m.genres || []))].sort();
+
     return html`
       <section>
-        ${list.length === 0 ? html`
+        <div class="toolbar">
+          <div class="filter-group">
+            <select @change=${e => { this.sortBy = e.target.value; this.requestUpdate(); }}>
+              <option value="date">Nejnovější</option>
+              <option value="rating">Dle ČSFD</option>
+              <option value="user_rating">Moje hodnocení</option>
+              <option value="year">Rok vydání</option>
+            </select>
+            <select @change=${e => { this.filterGenre = e.target.value; this.requestUpdate(); }}>
+              <option value="">Všechny žánry</option>
+              ${allGenres.map(g => html`<option value="${g}" ?selected=${this.filterGenre === g}>${g}</option>`)}
+            </select>
+            <select @change=${e => { this.filterType = e.target.value; this.requestUpdate(); }}>
+              <option value="">Vše (Film/Seriál)</option>
+              <option value="movie">Jen filmy</option>
+              <option value="series">Jen seriály</option>
+            </select>
+          </div>
+          <div style="font-size: 13px; color: var(--text-dim)">
+            Nalezeno: ${sorted.length}
+          </div>
+        </div>
+
+        ${sorted.length === 0 ? html`
           <div class="empty-state">
             <ha-icon icon="mdi:layers-off"></ha-icon>
-            <p>Seznam je zatím prázdný.</p>
+            <p>Seznam je zatím prázdný nebo žádný film neodpovídá filtru.</p>
           </div>
         ` : html`
           <div class="grid">
-            ${list.reverse().map(m => this._renderMovieCard(m))}
+            ${sorted.map(m => this._renderMovieCard(m))}
           </div>
         `}
       </section>
@@ -561,6 +639,7 @@ class MovieTrackerPanel extends LitElement {
         <div class="poster-wrapper">
           <img src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}" loading="lazy">
           ${m.rating ? html`<div class="rating-badge ${ratingClass}">${m.rating}</div>` : ''}
+          ${m.user_rating ? html`<div class="rating-badge" style="top: auto; bottom: 8px; background: var(--primary); font-size: 10px;">${'⭐'.repeat(m.user_rating)}</div>` : ''}
         </div>
         <div class="movie-info">
           <h4 class="movie-title">${m.title}</h4>
@@ -598,7 +677,7 @@ class MovieTrackerPanel extends LitElement {
 
             <div class="actions">
               <a href="${m.hellspy_url}" target="_blank" class="btn btn-primary" style="text-decoration:none">
-                <ha-icon icon="mdi:play"></ha-icon> Najít ke stažení
+                <ha-icon icon="mdi:play"></ha-icon> Sledovat
               </a>
               
               ${!isWatched ? html`
@@ -606,8 +685,22 @@ class MovieTrackerPanel extends LitElement {
                   <ha-icon icon="mdi:check"></ha-icon> Shlédnuto
                 </button>
               ` : html`
+                <div style="margin: 20px 0; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                  <div style="margin-bottom: 12px; font-weight: 700; display:flex; justify-content: space-between">
+                    <span>Vaše hodnocení:</span>
+                    <span style="color:var(--primary)">${m.user_rating ? '⭐'.repeat(m.user_rating) : 'Zatím nehodnoceno'}</span>
+                  </div>
+                  <div style="display:flex; gap: 8px;">
+                    ${[1,2,3,4,5].map(num => html`
+                      <button 
+                        style="background: ${m.user_rating >= num ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}; border:none; border-radius: 8px; width: 40px; height: 40px; color: white; cursor:pointer"
+                        @click=${() => this._action('rate', m, { rating: num })}
+                      >${num}</button>
+                    `)}
+                  </div>
+                </div>
                  <button class="btn btn-secondary" style="color:var(--danger)" @click=${() => this._action('delete_watched', m)}>
-                  <ha-icon icon="mdi:delete"></ha-icon> Smazat z knihovny
+                  <ha-icon icon="mdi:delete"></ha-icon> Smazat ze shlédnutých
                 </button>
               `}
 
@@ -622,7 +715,7 @@ class MovieTrackerPanel extends LitElement {
               ` : '')}
               
               <a href="${m.url}" target="_blank" class="btn btn-secondary">
-                <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD
+                <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
               </a>
             </div>
           </div>
