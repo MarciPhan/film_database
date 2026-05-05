@@ -87,12 +87,13 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
     tmdb_key = entry.data.get("tmdb_api_key", "")
     
+    from aiohttp import web
+
     class ProxyImageView(HomeAssistantView):
         url = "/api/movie_tracker/proxy_image"
         name = "api:movie_tracker:proxy_image"
         requires_auth = False
         async def get(self, request):
-            import aiohttp
             import hashlib
             image_url = request.query.get("url")
             if not image_url:
@@ -100,6 +101,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             
             # Local caching logic
             cache_dir = os.path.join(os.path.dirname(__file__), "www", "posters")
+            os.makedirs(cache_dir, exist_ok=True)
+            
             url_hash = hashlib.md5(image_url.encode()).hexdigest()
             ext = image_url.split(".")[-1].split("?")[0] if "." in image_url else "jpg"
             if ext not in ["jpg", "jpeg", "png", "webp"]: ext = "jpg"
@@ -114,6 +117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 "User-Agent": "Mozilla/5.0"
             }
             try:
+                import aiohttp
                 async with aiohttp.ClientSession() as session:
                     async with session.get(image_url, headers=headers, timeout=10) as resp:
                         if resp.status == 200:
@@ -135,7 +139,10 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             media_type = request.query.get("type", "movie")
             genre = request.query.get("genre")
             year = request.query.get("year")
-            min_rating = float(request.query.get("rating", 0))
+            try:
+                min_rating = float(request.query.get("rating", 0))
+            except:
+                min_rating = 0
             
             results = await get_discover(tmdb_key, media_type, genre, year, min_rating)
             return web.json_response(results)
