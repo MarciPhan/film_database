@@ -293,7 +293,9 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     # --- Register Panel ---
     if "movie-tracker" not in hass.data.get("frontend_panels", {}):
         try:
-            hass.components.frontend.async_register_panel(
+            from homeassistant.components import frontend
+            frontend.async_register_panel(
+                hass,
                 component_name="custom",
                 sidebar_title="Filmotéka",
                 sidebar_icon="mdi:movie-roll",
