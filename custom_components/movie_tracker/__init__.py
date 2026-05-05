@@ -77,19 +77,26 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             results = await CSFDScraper.search(query)
             return web.json_response(results)
 
+    tmdb_key = entry.data.get("tmdb_api_key", "")
+    
     class DetailView(HomeAssistantView):
         url = "/api/movie_tracker/detail"
         name = "api:movie_tracker:detail"
         requires_auth = True
         async def get(self, request):
             from aiohttp import web
-            url = request.query.get("url", "")
-            if not url:
-                return web.json_response({})
-            details = await CSFDScraper.get_details(url)
+            movie_id = request.query.get("id", "")
+            title = request.query.get("title", "")
+            if not movie_id and not title:
+                return web.json_response({"error": "Missing ID or Title"}, status=400)
+            
+            details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=tmdb_key)
             if details:
                 lang = data.get("settings", {}).get("language", "CZ")
-                details["hellspy_url"] = await get_hellspy_video_url(details["title"], language=lang)
+                # Add Hellspy search link instead of scraping (more reliable)
+                query = details["title"]
+                if lang == "CZ": query += " cz dabing"
+                details["hellspy_url"] = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
             return web.json_response(details)
 
     hass.http.register_view(PanelJsView())
