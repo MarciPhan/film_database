@@ -236,19 +236,26 @@ class CSFDScraper:
                                                                 "name": season.get("name") or f"{s_num}. řada",
                                                                 "episodes": []
                                                             }
+                                                            # Prepare tasks for direct Hellspy links for episodes
+                                                            ep_tasks = []
                                                             for ep in e_data.get("episodes", []):
                                                                 ep_num = ep.get("episode_number")
-                                                                ep_title = ep.get("name")
-                                                                # Generate Hellspy link for episode
                                                                 h_query = f"{details['title']} S{str(s_num).zfill(2)}E{str(ep_num).zfill(2)} cz dabing"
-                                                                h_url = f"https://hellspy.to/?query={urllib.parse.quote(h_query)}"
-                                                                
+                                                                ep_tasks.append((ep, h_query))
+                                                            
+                                                            sem = asyncio.Semaphore(5)
+                                                            async def get_direct_ep(e, q):
+                                                                async with sem:
+                                                                    return e, await get_hellspy_video_url(q, "CZ")
+                                                            
+                                                            ep_results = await asyncio.gather(*[get_direct_ep(e, q) for e, q in ep_tasks])
+                                                            for ep, h_url in ep_results:
                                                                 season_info["episodes"].append({
-                                                                    "title": ep_title,
-                                                                    "number": ep_num,
+                                                                    "title": ep.get("name"),
+                                                                    "number": ep.get("episode_number"),
                                                                     "overview": ep.get("overview"),
                                                                     "url": h_url,
-                                                                    "id": f"s{s_num}e{ep_num}"
+                                                                    "id": f"s{s_num}e{ep.get('episode_number')}"
                                                                 })
                                                             details["seasons"].append(season_info)
                         except Exception as e:
