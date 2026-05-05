@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 import asyncio
+import urllib.parse
 from datetime import datetime
 
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -90,14 +91,19 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             if not movie_id and not title:
                 return web.json_response({"error": "Missing ID or Title"}, status=400)
             
-            details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=tmdb_key)
-            if details:
-                lang = data.get("settings", {}).get("language", "CZ")
-                # Add Hellspy search link instead of scraping (more reliable)
-                query = details["title"]
-                if lang == "CZ": query += " cz dabing"
-                details["hellspy_url"] = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
-            return web.json_response(details)
+            try:
+                details = await CSFDScraper.get_details(movie_id, title, tmdb_api_key=tmdb_key)
+                if details:
+                    lang = data.get("settings", {}).get("language", "CZ")
+                    # Add Hellspy search link
+                    query_text = details.get("title", title)
+                    if lang == "CZ": query_text += " cz dabing"
+                    details["hellspy_url"] = f"https://hellspy.to/?query={urllib.parse.quote(query_text)}"
+                    return web.json_response(details)
+                return web.json_response({"error": "Movie not found"}, status=404)
+            except Exception as e:
+                _LOGGER.error("Error in DetailView: %s", e, exc_info=True)
+                return web.json_response({"error": str(e)}, status=500)
 
     hass.http.register_view(PanelJsView())
     hass.http.register_view(DataView())

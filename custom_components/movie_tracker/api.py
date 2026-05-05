@@ -102,7 +102,7 @@ class CSFDScraper:
                             "title": title,
                             "year": str(item.get("rok", "N/A")),
                             "url": item.get("csfd_url"),
-                            "image": image,
+                            "poster": image,
                             "type": "series" if is_series else "movie"
                         })
                     return results[:20]
@@ -215,7 +215,6 @@ async def get_hellspy_video_url(title: str, language: str = "CZ") -> str:
             async with session.get(search_url, timeout=10) as resp:
                 if resp.status == 200:
                     html = await resp.text()
-                    from bs4 import BeautifulSoup
                     soup = BeautifulSoup(html, "html.parser")
                     # Find the first link that contains '/video/'
                     first_video = soup.select_one("a[href*='/video/']")

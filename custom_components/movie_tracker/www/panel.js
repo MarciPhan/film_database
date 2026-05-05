@@ -559,7 +559,7 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <div class="movie-card" @click=${() => this._viewDetail(m)}>
         <div class="poster-wrapper">
-          <img src="${m.poster || m.image || 'https://via.placeholder.com/300x450?text=Bez+plakátu'}" loading="lazy">
+          <img src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}" loading="lazy">
           ${m.rating ? html`<div class="rating-badge ${ratingClass}">${m.rating}</div>` : ''}
         </div>
         <div class="movie-info">
@@ -578,7 +578,7 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <div class="modal-overlay" @click=${() => this.selectedMovie = null}>
         <div class="modal-content" @click=${e => e.stopPropagation()}>
-          <img class="modal-poster" src="${m.poster || m.image || 'https://via.placeholder.com/300x450?text=Bez+plakátu'}">
+          <img class="modal-poster" src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}">
           <div class="modal-details">
             <div style="display:flex; justify-content: space-between; align-items: flex-start;">
               <h2>${m.title}</h2>
