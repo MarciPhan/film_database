@@ -91,7 +91,9 @@ class MovieTrackerPanel extends LitElement {
       const title = movie.title || "";
       const r = await this.hass.fetchWithAuth(`/api/movie_tracker/detail?id=${id}&title=${encodeURIComponent(title)}`);
       if (r.ok) {
-        this.selectedMovie = await r.json();
+        const details = await r.json();
+        const localData = this.data.watched[id] || this.data.wishlist[id] || {};
+        this.selectedMovie = { ...details, ...localData };
       } else {
         this._t("Nepodařilo se načíst detaily");
       }
@@ -396,7 +398,9 @@ class MovieTrackerPanel extends LitElement {
       .modal-poster {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        max-height: 90vh;
+        object-fit: contain;
+        background: #0a0f18;
       }
 
       .modal-details {
@@ -770,7 +774,7 @@ class MovieTrackerPanel extends LitElement {
                 </div>
               </div>
 
-              ${!isWatched ? html`
+               ${!isWatched ? html`
                 <button class="btn btn-secondary" style="height: 50px;" @click=${() => this._action('watch', m)}>
                   <ha-icon icon="mdi:check"></ha-icon> Shlédnuto
                 </button>
@@ -788,17 +792,11 @@ class MovieTrackerPanel extends LitElement {
                  <button class="btn btn-secondary" style="height: 50px; color:var(--danger)" @click=${() => this._action('delete_wishlist', m)}>
                   <ha-icon icon="mdi:delete"></ha-icon> Z wishlistu
                 </button>
-              ` : html`
-                 <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
-                  <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
-                </a>
-              `)}
+              ` : '')}
 
-              ${!isWatched || isWishlist ? html`
-                <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
-                  <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
-                </a>
-              ` : ''}
+              <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
+                <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
+              </a>
             </div>
           </div>
         </div>

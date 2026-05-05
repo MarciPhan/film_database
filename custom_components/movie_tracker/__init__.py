@@ -149,9 +149,14 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         if not action or not movie:
             return
 
-        movie_id = movie.get("id") or str(uuid.uuid4())
+        movie_id = str(movie.get("id") or movie.get("csfd_id") or uuid.uuid4())
         
         if action == "watch":
+            # Get existing data if possible to preserve seasons/details
+            existing = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
+            if existing:
+                movie = {**movie, **existing}
+            
             data["watched"][movie_id] = movie
             data["watched"][movie_id]["watched_at"] = dt_util.now().isoformat()
             data["wishlist"].pop(movie_id, None)
@@ -167,7 +172,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             data["wishlist"].pop(movie_id, None)
             
         elif action == "watch_episode":
-            ep_id = call.data.get("episode_id")
+            ep_id = str(call.data.get("episode_id"))
             # Get movie from either list
             target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
             if not target:
@@ -186,7 +191,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 data["wishlist"].pop(movie_id, None)
 
         elif action == "rate_episode":
-            ep_id = call.data.get("episode_id")
+            ep_id = str(call.data.get("episode_id"))
             rating = call.data.get("rating")
             target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
             if not target:
@@ -203,30 +208,35 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             if movie_id not in data["watched"]:
                 data["watched"][movie_id] = target
                 data["wishlist"].pop(movie_id, None)
-
+        
         elif action == "watch_season":
             season_num = call.data.get("season_num")
             episodes = call.data.get("episodes", []) # List of episode IDs in this season
-            target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id) or call.data.get("movie")
-            if not target: return
+            target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id) or movie
             
             if "watched_episodes" not in target: target["watched_episodes"] = {}
             for ep_id in episodes:
-                target["watched_episodes"][ep_id] = target["watched_episodes"].get(ep_id, {})
-                target["watched_episodes"][ep_id]["watched"] = True
+                eid = str(ep_id)
+                target["watched_episodes"][eid] = target["watched_episodes"].get(eid, {})
+                target["watched_episodes"][eid]["watched"] = True
             
-            # Also store season rating if provided
             if movie_id not in data["watched"]:
                 data["watched"][movie_id] = target
                 data["wishlist"].pop(movie_id, None)
 
         elif action == "rate":
             rating = call.data.get("rating")
-            if movie_id in data["watched"]:
-                data["watched"][movie_id]["user_rating"] = rating
-            elif movie_id in data["wishlist"]:
-                 data["wishlist"][movie_id]["user_rating"] = rating
-        
+            target = data["watched"].get(movie_id) or data["wishlist"].get(movie_id)
+            if not target:
+                target = movie
+                data["watched"][movie_id] = target
+                data["wishlist"].pop(movie_id, None)
+            
+            target["user_rating"] = rating
+            if movie_id not in data["watched"]:
+                data["watched"][movie_id] = target
+                data["wishlist"].pop(movie_id, None)
+
         elif action == "update_settings":
             data["settings"].update(call.data.get("settings", {}))
         
