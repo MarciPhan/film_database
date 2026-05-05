@@ -10,7 +10,7 @@ from datetime import datetime
 
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
-from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION, EVENT_MOVIES_UPDATED
@@ -161,13 +161,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 # Try legacy API first
                 hass.http.register_static_path("/movie_tracker_static", static_path, cache_headers=False)
             except AttributeError:
-                # Fallback to new HA API (2024.11+)
+                # New HA API (2024.11+)
                 try:
-                    try:
-                        from homeassistant.components.http.static import StaticPathConfig
-                    except ImportError:
-                        from homeassistant.components.http import StaticPathConfig
-                    
                     await hass.http.async_register_static_paths([
                         StaticPathConfig("/movie_tracker_static", static_path, False)
                     ])
