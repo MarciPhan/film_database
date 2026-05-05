@@ -7,16 +7,16 @@ import uuid
 import asyncio
 import urllib.parse
 from datetime import datetime
-
+import aiohttp
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
-from homeassistant.components.http import HomeAssistantView, StaticPathConfig
+from homeassistant.components.http import HomeAssistantView
 import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION, EVENT_MOVIES_UPDATED
 from .api import search_movies, get_details, get_hellspy_video_url, get_recommendations
 
-from aiohttp import web
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,14 +124,19 @@ class DetailView(HomeAssistantView):
             return web.json_response({"error": str(e)}, status=500)
 
 # --- HTTP Views ---
-# --- Static Paths ---
-async def async_setup_static_path(hass: HomeAssistant):
-    """Register static path for the panel."""
-    hass.http.register_static_path(
-        "/movie_tracker_static",
-        os.path.join(os.path.dirname(__file__), "www"),
-        cache_headers=False
-    )
+# --- HTTP Views ---
+class MovieTrackerPanelView(HomeAssistantView):
+    """View to serve the panel JavaScript file directly."""
+    url = "/movie_tracker_static/panel.js"
+    name = "api:movie_tracker:panel"
+    requires_auth = False
+
+    async def get(self, request):
+        """Serve the panel.js file."""
+        file_path = os.path.join(os.path.dirname(__file__), "www", "panel.js")
+        if not os.path.exists(file_path):
+            return aiohttp.web.Response(status=404)
+        return aiohttp.web.FileResponse(file_path)
 
 async def async_setup(hass: HomeAssistant, config: dict):
     return True
@@ -160,22 +165,13 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             "store": store
         }
 
-        # Register static path
-        await async_setup_static_path(hass)
-
-        # Register views
-        views = [
-            DataView(data, tmdb_key),
-            SearchView(tmdb_key),
-            DetailView(data, tmdb_key),
-            ProxyImageView(),
-            DiscoverView(tmdb_key)
-        ]
-        for view in views:
-            try:
-                hass.http.register_view(view)
-            except Exception:
-                pass # Already registered
+        # Register views (HTTP serving)
+        hass.http.register_view(MovieTrackerPanelView())
+        hass.http.register_view(DataView(data, tmdb_key))
+        hass.http.register_view(SearchView(tmdb_key))
+        hass.http.register_view(DetailView(data, tmdb_key))
+        hass.http.register_view(ProxyImageView())
+        hass.http.register_view(DiscoverView(tmdb_key))
 
     except Exception as exc:
         _LOGGER.error("Error setting up Movie Tracker entry: %s", exc, exc_info=True)
@@ -298,12 +294,10 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 sidebar_title="Filmotéka",
                 sidebar_icon="mdi:movie-roll",
                 frontend_url_path="movie-tracker",
-                config={
-                    "_panel_custom": {
-                        "name": "movie-tracker-panel",
-                        "module_url": f"/movie_tracker_static/panel.js?v={int(time.time())}",
-                    }
-                },
+                config={"_panel_custom": {
+                    "name": "movie-tracker-panel",
+                    "module_url": f"/movie_tracker_static/panel.js?v={int(time.time())}"
+                }},
                 require_admin=False,
             )
         except Exception as exc:
