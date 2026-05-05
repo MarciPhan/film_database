@@ -39,7 +39,6 @@ class MovieTrackerPanel extends LitElement {
     this.discoverResults = [];
     this.discoverLoading = false;
     this.discoverFilters = { type: 'movie', genre: '', year: '', rating: 0 };
-    this._dismissedIds = new Set();
   }
 
   connectedCallback() {
@@ -132,11 +131,8 @@ class MovieTrackerPanel extends LitElement {
     }
   }
 
-      if (action === 'not_interested') {
-        this._dismissedIds.add(movie.id);
-        this.requestUpdate();
-      }
-
+  async _action(action, movie, extra = {}) {
+    try {
       await this._svc("movie_action", { action, movie, ...extra });
       
       const messages = {
@@ -387,33 +383,6 @@ class MovieTrackerPanel extends LitElement {
         font-size: 12px;
         font-weight: 700;
         border: 1px solid rgba(255,255,255,0.1);
-      }
-
-      .btn-dismiss {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: rgba(0,0,0,0.6);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        z-index: 10;
-        border: 1px solid rgba(255,255,255,0.1);
-        backdrop-filter: blur(4px);
-        opacity: 0;
-      }
-      .movie-card:hover .btn-dismiss {
-        opacity: 1;
-      }
-      .btn-dismiss:hover {
-        background: var(--danger);
-        transform: scale(1.1);
       }
 
       .rating-high { color: #4ade80; }
@@ -747,14 +716,10 @@ class MovieTrackerPanel extends LitElement {
         </div>
         
         <div class="grid" style="margin-bottom: 48px;">
-          ${(() => {
-            const serverDismissed = Object.keys(this.data.not_interested || {});
-            const filtered = (this.data.recommendations || []).filter(m => 
-              !this._dismissedIds.has(m.id) && !serverDismissed.includes(m.id)
-            );
-            if (!filtered.length) return html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`;
-            return filtered.map(m => this._renderMovieCard(m, true));
-          })()}
+          ${this.data.recommendations?.length ? 
+            this.data.recommendations.map(m => this._renderMovieCard(m)) : 
+            html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`
+          }
         </div>
         
         <h3 style="margin-bottom: 20px;">🍿 Shlédnuto</h3>
@@ -835,7 +800,7 @@ class MovieTrackerPanel extends LitElement {
     `;
   }
 
-  _renderMovieCard(m, isRecommendation = false) {
+  _renderMovieCard(m) {
     const ratingVal = parseInt(m.rating) || 0;
     const ratingClass = ratingVal >= 75 ? 'rating-high' : (ratingVal >= 50 ? 'rating-mid' : 'rating-low');
     
@@ -844,11 +809,6 @@ class MovieTrackerPanel extends LitElement {
         <div class="poster-wrapper">
           <img src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}" loading="lazy">
           ${m.rating ? html`<div class="rating-badge ${ratingClass}">${m.rating}</div>` : ''}
-          ${isRecommendation ? html`
-            <div class="btn-dismiss" title="Nezajímá mě" @click=${(e) => { e.stopPropagation(); this._action('not_interested', m); }}>
-              <ha-icon icon="mdi:close" style="--mdc-icon-size: 18px;"></ha-icon>
-            </div>
-          ` : ''}
           ${m.user_rating ? html`<div class="rating-badge" style="top: auto; bottom: 8px; background: var(--primary); font-size: 10px;">${'⭐'.repeat(m.user_rating)}</div>` : ''}
         </div>
         <div class="movie-info">
