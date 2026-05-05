@@ -135,7 +135,7 @@ class MovieTrackerPanelJsView(HomeAssistantView):
         path = os.path.join(os.path.dirname(__file__), "www", "panel.js")
         if not os.path.isfile(path):
             return web.Response(status=404, text="panel.js not found")
-        return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
+        return web.FileResponse(path, headers={"Cache-Control": "no-cache"}, content_type="application/javascript")
 
 async def async_setup(hass: HomeAssistant, config: dict):
     return True
@@ -293,9 +293,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     # --- Register Panel ---
     if "movie-tracker" not in hass.data.get("frontend_panels", {}):
         try:
-            from homeassistant.components.frontend import async_register_built_in_panel
-            async_register_built_in_panel(
-                hass,
+            hass.components.frontend.async_register_panel(
                 component_name="custom",
                 sidebar_title="Filmotéka",
                 sidebar_icon="mdi:movie-roll",

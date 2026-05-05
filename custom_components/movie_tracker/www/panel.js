@@ -111,7 +111,7 @@ class MovieTrackerPanel extends LitElement {
     this.loadingDetail = true;
     this.selectedSeason = 0;
     // Set initial data from search results to avoid blank screen/missing poster
-    this.selectedMovie = { ...movie };
+    this.selectedMovie = Object.assign({}, movie);
     
     try {
       const id = movie.id || movie.csfd_id || "";
@@ -121,7 +121,7 @@ class MovieTrackerPanel extends LitElement {
         const details = await r.json();
         const localData = this.data.watched[id] || this.data.wishlist[id] || {};
         // Merge order: Search Result < API Details < Local Saved Data
-        this.selectedMovie = { ...movie, ...details, ...localData };
+        this.selectedMovie = Object.assign({}, movie, details, localData);
       } else {
         this._t("Nepodařilo se načíst detaily");
       }
@@ -139,7 +139,7 @@ class MovieTrackerPanel extends LitElement {
         this.requestUpdate();
       }
 
-      await this._svc("movie_action", { action, movie, ...extra });
+      await this._svc("movie_action", Object.assign({ action: action, movie: movie }, extra));
       
       const messages = {
         'watch': "Přidáno do shlédnutých",
@@ -504,21 +504,6 @@ class MovieTrackerPanel extends LitElement {
         box-sizing: border-box;
       }
 
-      /* Custom scrollbar for premium look */
-      .modal-details::-webkit-scrollbar {
-        width: 6px;
-      }
-      .modal-details::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .modal-details::-webkit-scrollbar-thumb {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-      }
-      .modal-details::-webkit-scrollbar-thumb:hover {
-        background: rgba(255,255,255,0.2);
-      }
-
       .modal-details h2 {
         font-size: 32px;
         margin: 0 0 8px 0;
@@ -776,7 +761,7 @@ class MovieTrackerPanel extends LitElement {
     const list = this.tab === 'library' ? watched : wishlist;
     
     // Filtering and Sorting
-    let filtered = [...list];
+    let filtered = list.slice();
     if (this.filterGenre) {
       filtered = filtered.filter(m => m.genres?.includes(this.filterGenre));
     }
@@ -794,7 +779,13 @@ class MovieTrackerPanel extends LitElement {
       return dateB.localeCompare(dateA);
     });
 
-    const allGenres = [...new Set(list.flatMap(m => m.genres || []))].sort();
+    let allGenresSet = new Set();
+    watched.concat(wishlist).forEach(function(m) {
+      if (m.genres) {
+        m.genres.forEach(function(g) { allGenresSet.add(g); });
+      }
+    });
+    const allGenres = Array.from(allGenresSet).sort();
 
     return html`
       <section>
@@ -1000,10 +991,9 @@ class MovieTrackerPanel extends LitElement {
               </div>
             </div>
 
-              <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
-                <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
-              </a>
-            </div>
+            <a href="${m.url}" target="_blank" class="btn btn-secondary" style="height: 50px; text-decoration:none; display:flex; align-items:center; justify-content:center">
+              <ha-icon icon="mdi:open-in-new"></ha-icon> ČSFD (${m.rating})
+            </a>
           </div>
         </div>
       </div>
