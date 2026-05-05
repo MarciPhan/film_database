@@ -176,19 +176,41 @@ async def get_hellspy_video_url(title: str, language: str = "CZ") -> str:
     if language == "CZ" and "cz dabing" not in title.lower():
         query += " cz dabing"
     
+    # Try to extract SXXEXX if present
+    ep_pattern = re.search(r"S(\d+)E(\d+)", title, re.I)
+    ep_str = ep_pattern.group(0).upper() if ep_pattern else None
+
     search_url = f"https://hellspy.to/?query={urllib.parse.quote(query)}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "cs-CZ,cs;q=0.9,en;q=0.8"
+    }
     try:
+        # Add a small jitter to avoid bot detection
+        await asyncio.sleep(random.uniform(0.1, 0.5))
         async with aiohttp.ClientSession() as session:
             async with session.get(search_url, headers=headers, timeout=10) as resp:
                 if resp.status == 200:
                     html = await resp.text()
                     soup = BeautifulSoup(html, "html.parser")
-                    # Find any internal link that could be a video
+                    
+                    video_links = []
                     for link in soup.select("a"):
                         href = link.get("href", "")
-                        if "/video/" in href or "/stahuj/" in href or "/file/" in href:
-                            return f"https://hellspy.to{href}" if href.startswith("/") else href
+                        if not href: continue
+                        
+                        text = link.text.strip().upper()
+                        # Pattern matching for videos
+                        if any(p in href for p in ["/video/", "/stahuj/", "/file/", "/download/"]):
+                            full_url = f"https://hellspy.to{href}" if href.startswith("/") else href
+                            # If we searched for a specific episode, prioritize it in the title
+                            if ep_str and ep_str in text:
+                                return full_url
+                            video_links.append(full_url)
+                    
+                    if video_links:
+                        return video_links[0]
     except Exception as e:
         _LOGGER.debug("Failed to scrape Hellspy: %s", e)
     
@@ -222,11 +244,10 @@ async def get_discover(tmdb_api_key: str, media_type: str = "movie", genre_id: s
                 return results
     return []
 
-async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str, not_interested: list = None) -> list:
+async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_key: str) -> list:
     """Generate recommendations based on history, ratings and wishlist."""
     # 1. Get wishlist items
     wishlist = list(wishlist_data.values())
-    not_interested_set = set(not_interested or [])
     
     # Priority seeds: Top rated (4-5), Wishlist items, and Recent
     top_rated = [m for m in watched_data.values() if int(m.get("user_rating", 0)) >= 4]
@@ -257,7 +278,6 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                         r_data = await r_resp.json()
                                         for item in r_data.get("results", [])[:3]:
                                             r_id = f"tmdb_{item['id']}"
-                                            if r_id in not_interested_set: continue
                                             r_title = item.get("title") or item.get("name")
                                             if r_title.lower() in [w["title"].lower() for w in watched_data.values()]: continue
                                             if r_title.lower() in [w["title"].lower() for w in wishlist_data.values()]: continue
@@ -282,7 +302,6 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                         t_data = await resp.json()
                         for item in t_data.get("results", [])[:10]:
                             r_id = f"tmdb_{item['id']}"
-                            if r_id in not_interested_set: continue
                             r_title = item.get("title") or item.get("name")
                             if r_title.lower() in [w["title"].lower() for w in watched_data.values()]: continue
                             if r_title.lower() in [w["title"].lower() for w in wishlist_data.values()]: continue

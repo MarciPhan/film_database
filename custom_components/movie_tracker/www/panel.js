@@ -39,6 +39,7 @@ class MovieTrackerPanel extends LitElement {
     this.discoverResults = [];
     this.discoverLoading = false;
     this.discoverFilters = { type: 'movie', genre: '', year: '', rating: 0 };
+    this._dismissedIds = new Set();
   }
 
   connectedCallback() {
@@ -132,7 +133,12 @@ class MovieTrackerPanel extends LitElement {
   }
 
   async _action(action, movie, extra = {}) {
-    try {
+      if (action === 'not_interested') {
+        this._dismissedIds.add(movie.id);
+        this.requestUpdate();
+        return;
+      }
+
       await this._svc("movie_action", { action, movie, ...extra });
       
       const messages = {
@@ -744,8 +750,7 @@ class MovieTrackerPanel extends LitElement {
         
         <div class="grid" style="margin-bottom: 48px;">
           ${(() => {
-            const notInterested = this.data.not_interested || [];
-            const filtered = (this.data.recommendations || []).filter(m => !notInterested.includes(m.id));
+            const filtered = (this.data.recommendations || []).filter(m => !this._dismissedIds.has(m.id));
             if (!filtered.length) return html`<div class="empty-state" style="grid-column: 1/-1"><p>Žádná doporučení. Zkuste něco přidat do Shlédnuto!</p></div>`;
             return filtered.map(m => this._renderMovieCard(m, true));
           })()}
