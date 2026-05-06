@@ -8,6 +8,7 @@ import asyncio
 import urllib.parse
 from datetime import datetime
 import aiohttp
+from aiohttp import web
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
 from homeassistant.components.http import HomeAssistantView
@@ -73,15 +74,16 @@ class ProxyImageView(HomeAssistantView):
         if os.path.isfile(cache_path): return web.FileResponse(cache_path)
         headers = {"Referer": "https://www.csfd.cz/", "User-Agent": "Mozilla/5.0"}
         try:
-            import aiohttp
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_url, headers=headers, timeout=10) as resp:
                     if resp.status == 200:
                         content = await resp.read()
-                        with open(cache_path, "wb") as f: f.write(content)
-                        return aiohttp.web.Response(body=content, content_type=resp.content_type)
+                        def save_file():
+                            with open(cache_path, "wb") as f: f.write(content)
+                        await self.hass.async_add_executor_job(save_file)
+                        return web.Response(body=content, content_type=resp.content_type)
         except Exception as e: _LOGGER.error("Proxy image failed: %s", e)
-        return aiohttp.web.Response(status=404)
+        return web.Response(status=404)
 
 class DiscoverView(HomeAssistantView):
     url = "/api/movie_tracker/discover"
