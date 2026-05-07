@@ -273,24 +273,24 @@ class MovieTrackerPanel extends LitElement {
       /* Search Bar */
       .search-box {
         position: relative;
-        background: var(--card-bg);
+        background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         border: 1px solid var(--border-color);
-        border-radius: 20px;
-        padding: 6px 6px 6px 16px;
+        border-radius: 24px;
+        padding: 4px 4px 4px 16px;
         display: flex;
         align-items: center;
         gap: 12px;
-        margin-bottom: 24px;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        margin-bottom: 32px;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+        transition: all 0.3s ease;
       }
 
       .search-box:focus-within {
         border-color: var(--primary);
-        background: var(--card-bg-hover);
-        box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15), 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
       }
 
       .search-box input {
@@ -299,7 +299,7 @@ class MovieTrackerPanel extends LitElement {
         border: none;
         color: white;
         font-size: 16px;
-        padding: 10px 0;
+        padding: 12px 0;
         outline: none;
         font-family: inherit;
       }
@@ -308,12 +308,24 @@ class MovieTrackerPanel extends LitElement {
         background: var(--primary-gradient);
         color: white;
         border: none;
-        border-radius: 14px;
+        border-radius: 20px;
         padding: 10px 24px;
-        font-weight: 700;
+        font-weight: 800;
         cursor: pointer;
         transition: all 0.3s;
         box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+      }
+
+      @media (max-width: 600px) {
+        .search-box {
+          margin-bottom: 24px;
+        }
+        .search-box button {
+          padding: 10px 16px;
+        }
       }
 
       .search-box button:hover {
@@ -644,15 +656,59 @@ class MovieTrackerPanel extends LitElement {
           flex-direction: column;
         }
         .modal-poster {
-          height: 40vh;
-          min-height: 300px;
+          height: 35vh;
+          min-height: 250px;
           border-right: none;
           border-bottom: 1px solid var(--border-color);
         }
         .modal-details {
           flex: 1;
+          padding: 24px;
+          margin-top: -30px;
+          background: var(--bg-dark);
+          border-radius: 30px 30px 0 0;
+          position: relative;
+          z-index: 2;
+        }
+        .modal-close-mobile {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          z-index: 10;
+          background: rgba(0,0,0,0.5);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(255,255,255,0.1);
         }
       }
+
+      .modal-poster-container {
+        position: relative;
+        width: 100%;
+        background: #020617;
+      }
+
+      .modal-poster-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, transparent 50%, var(--bg-dark));
+        display: none;
+      }
+
+      @media (max-width: 900px) {
+        .modal-poster-overlay {
+          display: block;
+        }
+      }
+
+      .desktop-only { display: flex; }
+      @media (max-width: 900px) { .desktop-only { display: none !important; } }
 
       .modal-poster {
         width: 100%;
@@ -1118,16 +1174,22 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <div class="modal-overlay" @click=${() => this.selectedMovie = null}>
         <div class="modal-content" @click=${e => e.stopPropagation()}>
-          <img class="modal-poster" 
-               src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}"
-               @error=${e => e.target.src = 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Plakát+nenalezen'}>
+          <div class="modal-poster-container">
+            <div class="modal-close-mobile" @click=${() => this.selectedMovie = null}>
+              <ha-icon icon="mdi:close" style="color: white; --mdc-icon-size: 20px;"></ha-icon>
+            </div>
+            <img class="modal-poster" 
+                 src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}"
+                 @error=${e => e.target.src = 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Plakát+nenalezen'}>
+            <div class="modal-poster-overlay"></div>
+          </div>
           <div class="modal-details">
             <div style="display:flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
               <div style="flex: 1">
-                <h2>${m.title}</h2>
-                <div style="color:var(--text-dim); font-size: 14px; font-weight: 600; margin-top: 4px;">${m.origin}</div>
+                <h2 style="font-size: clamp(20px, 5vw, 32px);">${m.title}</h2>
+                <div style="color:var(--text-dim); font-size: 13px; font-weight: 600; margin-top: 4px;">${m.origin}</div>
               </div>
-              <button style="background:rgba(255,255,255,0.05); border:none; color:white; cursor:pointer; width: 40px; height: 40px; border-radius: 50%; display:flex; align-items:center; justify-content:center; flex-shrink: 0;" @click=${() => this.selectedMovie = null}>
+              <button class="desktop-only" style="background:rgba(255,255,255,0.05); border:none; color:white; cursor:pointer; width: 40px; height: 40px; border-radius: 50%; display:flex; align-items:center; justify-content:center; flex-shrink: 0;" @click=${() => this.selectedMovie = null}>
                 <ha-icon icon="mdi:close"></ha-icon>
               </button>
             </div>
@@ -1301,7 +1363,7 @@ class MovieTrackerPanel extends LitElement {
             <ha-circular-progress active></ha-circular-progress>
           </div>
         ` : html`
-          <div class="carousel">
+          <div class="grid">
             ${this.discoverResults.map(m => this._renderMovieCard(m))}
           </div>
         `}
