@@ -653,37 +653,50 @@ class MovieTrackerPanel extends LitElement {
           border-radius: 0;
           display: flex;
           flex-direction: column;
+          background: var(--bg-dark);
         }
-        .modal-poster {
-          height: 25vh;
-          min-height: 200px;
-          border-right: none;
-          border-bottom: 1px solid var(--border-color);
+        .modal-poster-container {
+          display: none;
         }
         .modal-details {
           flex: 1;
           padding: 24px;
-          margin-top: -30px;
           background: var(--bg-dark);
-          border-radius: 30px 30px 0 0;
           position: relative;
           z-index: 2;
         }
         .modal-close-mobile {
-          position: absolute;
+          position: fixed;
           top: 16px;
           right: 16px;
-          z-index: 10;
-          background: rgba(0,0,0,0.5);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
+          z-index: 100;
+          background: rgba(255,255,255,0.05);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           border-radius: 50%;
-          width: 36px;
-          height: 36px;
+          width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
           border: 1px solid rgba(255,255,255,0.1);
+        }
+      }
+      
+      .mobile-thumbnail {
+        display: none;
+        width: 100px;
+        height: 150px;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        border: 1px solid var(--border-color);
+        flex-shrink: 0;
+      }
+      
+      @media (max-width: 900px) {
+        .mobile-thumbnail {
+          display: block;
         }
       }
 
@@ -1183,19 +1196,24 @@ class MovieTrackerPanel extends LitElement {
             <div class="modal-poster-overlay"></div>
           </div>
           <div class="modal-details">
-            <div style="display:flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+            <div style="display:flex; align-items: flex-start; gap: 20px; margin-bottom: 24px;">
+              <img class="mobile-thumbnail" src="${m.poster || ''}">
               <div style="flex: 1">
-                <h2 style="font-size: clamp(20px, 5vw, 32px);">${m.title}</h2>
-                <div style="color:var(--text-dim); font-size: 13px; font-weight: 600; margin-top: 4px;">${m.origin}</div>
+                <div style="display:flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                  <div style="flex: 1">
+                    <h2 style="font-size: clamp(20px, 5vw, 32px);">${m.title}</h2>
+                    <div style="color:var(--text-dim); font-size: 13px; font-weight: 600; margin-top: 4px;">${m.origin}</div>
+                  </div>
+                  <button class="desktop-only" style="background:rgba(255,255,255,0.05); border:none; color:white; cursor:pointer; width: 40px; height: 40px; border-radius: 50%; display:flex; align-items:center; justify-content:center; flex-shrink: 0;" @click=${() => this.selectedMovie = null}>
+                    <ha-icon icon="mdi:close"></ha-icon>
+                  </button>
+                </div>
+                
+                <div class="genres" style="margin-top: 12px;">
+                  ${m.genres?.map(g => html`<span class="genre-tag">${g}</span>`)}
+                  ${m.rating ? html`<span class="genre-tag" style="background:rgba(255,255,255,0.08); color:white; border-color: rgba(255,255,255,0.1)">⭐ ${m.rating.toString().replace('%', '')}%</span>` : ''}
+                </div>
               </div>
-              <button class="desktop-only" style="background:rgba(255,255,255,0.05); border:none; color:white; cursor:pointer; width: 40px; height: 40px; border-radius: 50%; display:flex; align-items:center; justify-content:center; flex-shrink: 0;" @click=${() => this.selectedMovie = null}>
-                <ha-icon icon="mdi:close"></ha-icon>
-              </button>
-            </div>
-            
-            <div class="genres">
-              ${m.genres?.map(g => html`<span class="genre-tag">${g}</span>`)}
-              ${m.rating ? html`<span class="genre-tag" style="background:rgba(255,255,255,0.08); color:white; border-color: rgba(255,255,255,0.1)">⭐ ${m.rating.toString().replace('%', '')}%</span>` : ''}
             </div>
 
             <p class="plot">${m.description || 'K tomuto titulu zatím není k dispozici žádný popis.'}</p>
