@@ -670,16 +670,17 @@ class MovieTrackerPanel extends LitElement {
           top: 16px;
           right: 16px;
           z-index: 100;
-          background: rgba(255,255,255,0.05);
+          background: rgba(0,0,0,0.5);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           border-radius: 50%;
-          width: 40px;
-          height: 40px;
+          width: 44px;
+          height: 44px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.2);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
       }
       
@@ -1186,9 +1187,6 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <div class="modal-overlay" @click=${() => this.selectedMovie = null}>
         <div class="modal-content" @click=${e => e.stopPropagation()}>
-          <div class="modal-close-mobile" @click=${() => this.selectedMovie = null}>
-            <ha-icon icon="mdi:close" style="color: white; --mdc-icon-size: 24px;"></ha-icon>
-          </div>
           <div class="modal-poster-container">
             <img class="modal-poster" 
                  src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}"
@@ -1196,6 +1194,9 @@ class MovieTrackerPanel extends LitElement {
             <div class="modal-poster-overlay"></div>
           </div>
           <div class="modal-details">
+            <div class="modal-close-mobile" @click=${() => this.selectedMovie = null}>
+              <ha-icon icon="mdi:close" style="color: white; --mdc-icon-size: 24px;"></ha-icon>
+            </div>
             <div style="display:flex; align-items: flex-start; gap: 20px; margin-bottom: 24px;">
               <img class="mobile-thumbnail" src="${m.poster || ''}">
               <div style="flex: 1">
