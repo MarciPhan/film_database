@@ -103,6 +103,7 @@ async def get_details(title: str, is_series: bool = False, tmdb_api_key: str = N
         "genres": [],
         "origin": "",
         "seasons": [],
+        "url": f"https://www.csfd.cz/hledat/?q={urllib.parse.quote(title)}",
         "hellspy_url": f"https://hellspy.to/?query={urllib.parse.quote(title + (' cz dabing' if not is_series else ''))}"
     }
 
@@ -250,7 +251,8 @@ async def get_discover(tmdb_api_key: str, media_type: str = "movie", genre_id: s
                         "rating": f"{int(item.get('vote_average', 0) * 10)}%",
                         "poster": poster,
                         "type": "series" if media_type == "tv" else "movie",
-                        "description": item.get("overview", "")
+                        "description": item.get("overview", ""),
+                        "url": f"https://www.csfd.cz/hledat/?q={urllib.parse.quote(title)}"
                     })
                 return results
     return []
@@ -309,7 +311,8 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
                                                 "poster": poster,
                                                 "type": "series" if t_type == "tv" else "movie",
-                                                "description": item.get("overview", "")
+                                                "description": item.get("overview", ""),
+                                                "url": f"https://www.csfd.cz/hledat/?q={urllib.parse.quote(r_title)}"
                                             })
                 except: continue
 
@@ -334,7 +337,8 @@ async def get_recommendations(watched_data: dict, wishlist_data: dict, tmdb_api_
                                 "rating": f"{int(item.get('vote_average', 0) * 10)}%",
                                 "poster": poster,
                                 "type": "series" if item.get("media_type") == "tv" else "movie",
-                                "description": item.get("overview", "")
+                                "description": item.get("overview", ""),
+                                "url": f"https://www.csfd.cz/hledat/?q={urllib.parse.quote(r_title)}"
                             })
             except: pass
 

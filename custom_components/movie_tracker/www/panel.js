@@ -1186,10 +1186,10 @@ class MovieTrackerPanel extends LitElement {
     return html`
       <div class="modal-overlay" @click=${() => this.selectedMovie = null}>
         <div class="modal-content" @click=${e => e.stopPropagation()}>
+          <div class="modal-close-mobile" @click=${() => this.selectedMovie = null}>
+            <ha-icon icon="mdi:close" style="color: white; --mdc-icon-size: 24px;"></ha-icon>
+          </div>
           <div class="modal-poster-container">
-            <div class="modal-close-mobile" @click=${() => this.selectedMovie = null}>
-              <ha-icon icon="mdi:close" style="color: white; --mdc-icon-size: 20px;"></ha-icon>
-            </div>
             <img class="modal-poster" 
                  src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}"
                  @error=${e => e.target.src = 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Plakát+nenalezen'}>
