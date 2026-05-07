@@ -378,8 +378,7 @@ class MovieTrackerPanel extends LitElement {
 
       @media (max-width: 600px) {
         .tabs {
-          width: 100%;
-          justify-content: space-between;
+          display: none;
         }
         .tab {
           padding: 8px 12px;
