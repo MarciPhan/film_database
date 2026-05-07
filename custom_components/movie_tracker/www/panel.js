@@ -643,6 +643,10 @@ class MovieTrackerPanel extends LitElement {
         to { transform: scale(1) translateY(0); opacity: 1; }
       }
 
+      .modal-close-mobile {
+        display: none;
+      }
+
       @media (max-width: 900px) {
         .modal-overlay {
           padding: 0;
@@ -1222,11 +1226,11 @@ class MovieTrackerPanel extends LitElement {
             ${m.seasons?.length ? html`
               <div class="seasons-container" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 24px;">
                 <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 800;">Sezóny a epizody</h3>
-                <div style="display:flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 16px; scrollbar-width: none;">
+                <div style="display:flex; gap: 10px; overflow-x: auto; padding: 4px; margin-bottom: 16px; scrollbar-width: thin; scrollbar-color: var(--primary) transparent;">
                   ${m.seasons.map((s, idx) => html`
                     <button 
-                      class="${this.selectedSeason === idx ? 'tab active' : 'tab'}"
-                      style="padding: 8px 16px; font-size: 13px;"
+                      class="btn-secondary ${this.selectedSeason === idx ? 'active' : ''}"
+                      style="padding: 10px 20px; font-size: 14px; border-radius: 12px; white-space: nowrap; ${this.selectedSeason === idx ? 'background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);' : 'background: rgba(255,255,255,0.05); color: var(--text-dim);'}"
                       @click=${() => { this.selectedSeason = idx; this.requestUpdate(); }}
                     >${s.name}</button>
                   `)}
