@@ -655,8 +655,8 @@ class MovieTrackerPanel extends LitElement {
           flex-direction: column;
         }
         .modal-poster {
-          height: 35vh;
-          min-height: 250px;
+          height: 25vh;
+          min-height: 200px;
           border-right: none;
           border-bottom: 1px solid var(--border-color);
         }
@@ -1149,7 +1149,7 @@ class MovieTrackerPanel extends LitElement {
         <div class="poster-wrapper">
           <img src="${m.poster || 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}" loading="lazy"
                @error=${e => e.target.src = 'https://dummyimage.com/300x450/1e293b/f8fafc&text=Bez+plakátu'}>
-          ${m.rating ? html`<div class="rating-badge ${ratingClass}">${m.rating}%</div>` : ''}
+          ${m.rating ? html`<div class="rating-badge ${ratingClass}">${m.rating.toString().replace('%', '')}%</div>` : ''}
           ${isRecommendation ? html`
             <div class="btn-dismiss" title="Nezajímá mě" @click=${(e) => { e.stopPropagation(); this._action('not_interested', m); }}>
               <ha-icon icon="mdi:close" style="--mdc-icon-size: 18px;"></ha-icon>
@@ -1195,7 +1195,7 @@ class MovieTrackerPanel extends LitElement {
             
             <div class="genres">
               ${m.genres?.map(g => html`<span class="genre-tag">${g}</span>`)}
-              ${m.rating ? html`<span class="genre-tag" style="background:rgba(255,255,255,0.08); color:white; border-color: rgba(255,255,255,0.1)">⭐ ${m.rating}%</span>` : ''}
+              ${m.rating ? html`<span class="genre-tag" style="background:rgba(255,255,255,0.08); color:white; border-color: rgba(255,255,255,0.1)">⭐ ${m.rating.toString().replace('%', '')}%</span>` : ''}
             </div>
 
             <p class="plot">${m.description || 'K tomuto titulu zatím není k dispozici žádný popis.'}</p>
@@ -1314,7 +1314,7 @@ class MovieTrackerPanel extends LitElement {
             </div>
 
             <a href="${m.url}" target="_blank" class="btn-secondary" style="height: 52px; text-decoration:none; border-radius: 16px;">
-              <ha-icon icon="mdi:open-in-new" style="--mdc-icon-size: 20px;"></ha-icon> Otevřít ČSFD (${m.rating}%)
+              <ha-icon icon="mdi:open-in-new" style="--mdc-icon-size: 20px;"></ha-icon> Otevřít ČSFD (${m.rating.toString().replace('%', '')}%)
             </a>
           </div>
         </div>
